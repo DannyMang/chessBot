@@ -1,0 +1,50 @@
+# Rust specific ignores
+/backend/chessBackend/target/
+**/*.rs.bk
+*.pdb
+
+# Debug artifacts
+/backend/chessBackend/debug/
+/backend/chessBackend/release/
+
+# Generated documentation
+/backend/chessBackend/doc/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node.js dependencies (for your frontend)
+/chess-frontend/node_modules/
+/chess-frontend/.pnp
+/chess-frontend/.pnp.js
+
+# Frontend build outputs
+/chess-frontend/build/
+/chess-frontend/dist/
+/chess-frontend/.next/
+/chess-frontend/out/
+
+# Coverage directory
+/chess-frontend/coverage/
+
+# Frontend logs
+/chess-frontend/npm-debug.log*
+/chess-frontend/yarn-debug.log*
+/chess-frontend/yarn-error.log*
+
+# Frontend local env files
+/chess-frontend/.env.local
+/chess-frontend/.env.development.local
+/chess-frontend/.env.test.local
+/chess-frontend/.env.production.local 
