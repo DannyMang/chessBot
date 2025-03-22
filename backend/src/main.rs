@@ -29,9 +29,11 @@ async fn main() {
     let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
     println!("Server running on http://{}", addr);
 
-    // Start the server (updated for Axum 0.7.x)
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    // Start the server
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
 
 // Simple health check endpoint

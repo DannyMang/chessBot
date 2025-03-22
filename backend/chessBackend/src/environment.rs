@@ -80,7 +80,7 @@ pub struct ChessEnv{
 
 }
 
-impl struct ChessEnv{
+impl ChessEnv{
     pub fn new() -> Self{
         let board = ChessBoard::new();
         Self{
