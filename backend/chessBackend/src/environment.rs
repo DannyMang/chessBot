@@ -8,9 +8,10 @@ Determines terminal states
 
 */
 
-use burn::prelude::*;
+use burn::tensor::Tensor;
+use burn::backend::wgpu::Wgpu;
 
-
+#[derive(Clone)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -20,11 +21,13 @@ pub enum PieceType {
     King,
 }
 
+#[derive(Clone)]
 pub enum Color{
     White,
     Black,
 }
 
+#[derive(Clone, Copy)]
 pub struct Piece{
     pub piece_type: PieceType,
     pub color: Color,
@@ -46,7 +49,7 @@ pub struct Move{
     pub to: (usize, usize),
     pub special_move: Option<SpecialMove>,
 }
-
+#[derive(Clone)]
 pub enum GameState {
     InProgress,
     Check(Color),
@@ -76,8 +79,6 @@ pub struct CastlingRights {
 
 pub struct ChessEnv{
     board: ChessBoard,
-   //ub reward_scale:f32,
-
 }
 
 impl ChessEnv{
@@ -85,7 +86,6 @@ impl ChessEnv{
         let board = ChessBoard::new();
         Self{
             board,
-            reward_scale: 1.0,
         }
     }
 
@@ -93,16 +93,15 @@ impl ChessEnv{
         self.board = ChessBoard::new();
     }
 
-    pub fn step(&mut self, action: Move) -> (f32, GameState, bool){
-       let valid = self.board.is_valid_move(action);
+    pub fn step(&mut self, action: Move) -> (GameState, GameState, bool) {
+        let valid = self.board.is_valid_move(&action);
 
-       if !valid {
-        // Invalid move penalty
-        return (self.board.state.clone(), -1.0, false);
+        if !valid {
+            return (self.board.state.clone(), self.board.state.clone(), false);
         }
         
         // Calculate reward based on the new state
-        let reward = self.calculate_reward();
+        let _reward = self.calculate_reward();
         
         // Check if the game is done
         let done = match self.board.state {
@@ -110,7 +109,7 @@ impl ChessEnv{
             _ => true,
         };
         
-        (self.board.state.clone(), reward, done)
+        (self.board.state.clone(), self.board.state.clone(), done)
     }
 
     fn calculate_reward(&self) -> f32{
@@ -118,9 +117,9 @@ impl ChessEnv{
         return 0.0;
     }
 
-    pub fn get_observation(&self) -> Tensor<f32, 2>{
-
-        // we prob need backend or smt and then see what the data format that chess.js sends us
+    pub fn get_observation(&self) -> Tensor<Wgpu, 2> {
+        let device = Default::default();
+        Tensor::<Wgpu, 2>::zeros([8, 8], &device)
     }
 
 }
@@ -207,9 +206,9 @@ impl ChessBoard{
         true
     }
     
-    fn is_valid_move(&self, mv: &Move) -> bool {
-        // Implement move validation
-        todo!("Implement move validation")
+    fn is_valid_move(&self, _mv: &Move) -> bool {
+        // Implementation here
+        true  // or your actual implementation
     }
     
     fn update_game_state(&mut self) {

@@ -8,8 +8,7 @@ use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 
 // Import your chess environment (adjust the path as needed)
-mod environment;
-use environment::ChessEnv;
+// mod environment;
 
 #[tokio::main]
 async fn main() {
