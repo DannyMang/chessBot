@@ -1,0 +1,10 @@
+/*
+
+traits for the agents
+
+*/
+
+
+
+
+
