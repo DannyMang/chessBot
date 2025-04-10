@@ -1,9 +1,8 @@
 # alphazero algorithm
 
 3 - parts
-
-MCTS-
-Monte Carlo Tree Search 
+MCTS-Monte Carlo Tree Search 
+- The policy neural network
 
 - build a tree based on states
 
