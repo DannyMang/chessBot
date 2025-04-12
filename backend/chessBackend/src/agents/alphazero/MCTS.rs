@@ -88,4 +88,47 @@ impl UCTNode{
             }
         }
     }
+
+     // mathemtically speaking, UCB is Q + c * sqrt(ln(parent_visits) / child_visits)
+
+    //Q value of the child node
+    // exploitation component in the UCB formula
+    pub fn child_Q(&mut self) -> f32 {
+        &self.child_total_value / (1.0 + &self.child_number_visits)
+    }
+
+    //U value of the child node
+    // exploration component in the UCB formula
+    pub fn child_U(&mut self) -> f32 {
+        let sqrt_parent_visits = (self.number_visits() as f32).sqrt();
+        sqrt_parent_visit * (&self.child_priors.mapv(f32::abs) / (1.0 + &self.child_number_visits))
+    }
+
+    // we then either choose to explore or exploit, choose childQ or childU
+
+    pub fn best_child(&self) -> usize{
+        // we check if action_idxes is empty, if it is, we return 0
+        if !self.action_idxes.is_empty(){
+            let scores = self.child_Q() + self.child_U();
+            let mut best_score = f32::NEG_INFINITY;
+            let mut best_move = 0;
+
+            // we iterate through the action_idxes and find the best score  
+            for &idx in &self.action_idxes {
+                if scores[idx] > best_score {
+                    best_score = scores[idx];
+                    best_move = idx;
+                }
+            }
+            best_move
+        } else {
+            let scores = self.child_q() + self.child_u();
+            scores.argmax().unwrap()
+        }
+    }
+
+
+
+    
+    
 }
