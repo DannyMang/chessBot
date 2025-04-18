@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use burn::tensor::Tensor;
 use ndarray::{Array1, Array2};
-
+use rand::distributions::{Dirichlet, Distribution};
 
 #[derive(Debug)]
 pub struct DummyNode {
@@ -30,7 +30,7 @@ impl DummyNode {
 pub struct UCTNode {
     game :ChessBoard,
     move_idx : Option<usize>,
-    is_terminal : bool,
+    is_expanded : bool,
     // RC(Reference Counted) is a pointer to a UCTNode, allows multiple parts to share ownership to UCTNode
     //RefCell provides interior mutability, allows us to mutate the UCTNode even if it is borrowed, Moves borrow checking from compile time to runtime
     parent : Option<Rc<RefCell<UCTNode>>>,
@@ -127,7 +127,73 @@ impl UCTNode{
         }
     }
 
+    pub fn select_leaf(&mut self) -> Rc<RefCell<UCTNode>> {
+        let mut current = Rc::new(RefCell::new(self.clone()));
+        while current.borrow().is_expanded {
+            let best_move = current.borrow().best_child();
+            current = current.borrow_mut().maybe_add_child(best_move);
+        }
+        current
+    }
 
+
+   // Add Dirichlet noise to the child priors at the root node
+    // Dirichlet noise encourages exploration by perturbing the prior probabilities
+    // The formula used is: P'(s,a) = (1-ε) * P(s,a) + ε * Dir(α)
+    // Where ε=0.25 and α=0.3 in this implementation
+    pub fn add_dirichlet_noise(&mut self, action_idxs: &[usize], mut child_priors: Array1<f32>) -> Array1<f32> {
+        // Create Dirichlet noise
+        let alpha = vec![0.3; action_idxs.len()];
+        let dirichlet = Dirichlet::new(&alpha).unwrap();
+        let noise: Vec<f32> = dirichlet.sample(&mut rand::thread_rng());
+        
+        // Apply noise only to legal moves
+        for (i, &idx) in action_idxs.iter().enumerate() {
+            child_priors[idx] = 0.75 * child_priors[idx] + 0.25 * noise[i];
+        }
+        
+        child_priors
+    }
+
+    // Expands a leaf node by calculating valid actions and assigning probabilities to them.
+    pub fn expand(&mut self, priors: Array1<f32>, action_idxes: Vec<usize>) {
+       self.is_expanded = true;
+       let mut action_idxes = Vec::new();
+
+       //TO -DO....!!!!!!!et_valid_moves does not seem to be implemented in the ChessBoard struct
+       for action in self.game.get_valid_moves() {
+            let (initial_pos, final_pos, promotion) = match action {
+                Move { from, to, special_move } => {
+                    (from, to, special_move)
+                }
+            };
+            // TO-DO ENCODE ACTION DOES NOT EXIST, NEED TO MAKE AN ENCODER DECODER HELPER FILE 
+            let encoded_action = encode_action(&self.game, initial_pos, final_pos, promotion);
+            action_idxs.push(encoded_action);
+        }
+
+        if action_idxs.is_empty() {
+            self.is_expanded = false;
+            return;
+        }
+
+        self.action_idxes = action_idxs.clone();
+
+        // Mask illegal actions
+        for i in 0..child_priors.len() {
+            if !action_idxs.contains(&i) {
+                child_priors[i] = 0.0;
+            }
+        }
+
+        // Add Dirichlet noise at root
+        if self.parent.as_ref().map_or(true, |p| p.borrow().parent.is_none()) {
+            child_priors = self.add_dirichlet_noise(&action_idxs, child_priors);
+        }
+
+        self.child_priors = child_priors;
+
+    }
 
     
     
