@@ -7,3 +7,7 @@ chess bot using burn deep learning framework
 after model is built out 
 - after training ( hopefully < 20$ on gpu )
 - will see performance 
+
+
+to-do apr 22
+-finished MCTS, finish first iteration of NN by fri 
