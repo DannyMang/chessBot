@@ -38,15 +38,6 @@ export default function GameSetup({ onGameStart }: GameSetupProps) {
       }} />
       
       <div style={{ position: 'relative', zIndex: 2 }}>
-        <h1 style={{
-          fontSize: '2.5rem',
-          marginBottom: '2rem',
-          color: 'white',
-          textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
-          textAlign: 'center'
-        }}>
-          Chess Bot Game
-        </h1>
         
         <div style={{
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -62,7 +53,7 @@ export default function GameSetup({ onGameStart }: GameSetupProps) {
             marginBottom: '1.5rem',
             color: '#333'
           }}>
-            Choose Your Color
+            a small chess bot project
           </h2>
           
           <div style={{
@@ -97,7 +88,7 @@ export default function GameSetup({ onGameStart }: GameSetupProps) {
                 e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
               }}
             >
-              ⚪ Play as White
+             Play as White
             </button>
             
             <button
@@ -127,7 +118,7 @@ export default function GameSetup({ onGameStart }: GameSetupProps) {
                 e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
               }}
             >
-              ⚫ Play as Black
+              Play as Black
             </button>
           </div>
           
@@ -136,7 +127,28 @@ export default function GameSetup({ onGameStart }: GameSetupProps) {
             color: '#666',
             fontSize: '0.9rem'
           }}>
-            You'll be playing against the Chess Bot AI
+            made by{' '}
+            <a 
+              href="https://x.com/danielung19" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{
+                color: '#1da1f2',
+                textDecoration: 'none',
+                fontWeight: 'bold',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.color = '#0d8bd9';
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.color = '#1da1f2';
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              @danielung19
+            </a>
           </p>
         </div>
       </div>

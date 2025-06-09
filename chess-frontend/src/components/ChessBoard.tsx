@@ -169,81 +169,136 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
   }, [backendResponse]);
 
   return (
-    <div style={{ maxWidth: "600px", margin: "auto" }}>
-      <div className="game-status">
-        <h2>Chess Bot Game</h2>
-        <p>You are playing as: <strong>{playerColor === 'white' ? 'White' : 'Black'}</strong></p>
-        <p>Current turn: <strong>{game.turn() === 'w' ? 'White' : 'Black'}</strong></p>
-      </div>
+    <>
+      {/* Background Layer - Completely Separate */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundImage: 'url(/che.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: '70% 30%',
+        backgroundRepeat: 'no-repeat',
+        zIndex: -1
+      }} />
       
-      <Chessboard 
-        position={game.fen()} 
-        onPieceDrop={onDrop} 
-        boardWidth={600}
-        boardOrientation={playerColor}
-      />
-      
-      <div style={{ marginTop: "20px", textAlign: "center" }}>
-        <button
-          onClick={() => {
+      {/* Content Layer */}
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        {/* Chessboard Container - Keep Simple! */}
+        <div style={{
+          width: '600px',
+          height: '600px',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          padding: '10px',
+          borderRadius: '15px',
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.3)'
+        }}>
+          <Chessboard 
+            position={game.fen()} 
+            onPieceDrop={onDrop} 
+            boardWidth={580}
+            boardOrientation={playerColor}
+          />
+        </div>
+        
+        {/* Controls */}
+        <div style={{ 
+          marginTop: "20px", 
+          textAlign: "center",
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          padding: '20px',
+          borderRadius: '15px',
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.3)'
+        }}>
+          <button onClick={() => {
             setGame(new Chess());
             setBackendResponse(null);
             setBackendError(null);
             setGameStarted(false);
-          }}
-          style={{ marginRight: "10px" }}
-        >
-          Reset Game
-        </button>
-        
-        <button
-          onClick={onBackToSetup}
-          style={{ 
+          }} style={{ marginRight: '10px' }}>
+            Reset Game
+          </button>
+          
+          <button onClick={onBackToSetup} style={{ 
             backgroundColor: '#6c757d',
             color: 'white',
             border: 'none',
             padding: '8px 16px',
             borderRadius: '4px',
             cursor: 'pointer'
-          }}
-        >
-          Back to Setup
-        </button>
-        
-        <p style={{ marginTop: '20px', fontSize: '14px', color: '#666' }}>
-          Current FEN: {game.fen()}
-        </p>
-
-        {isLoading && <p style={{ color: '#007bff', fontWeight: 'bold' }}>Waiting for AI move...</p>}
-        {backendError && <p style={{ color: "red" }}>Error: {backendError}</p>}
-        {backendResponse && (
-          <div style={{ 
-            marginTop: "15px", 
-            padding: "10px", 
-            backgroundColor: "#d4edda", 
-            borderRadius: "5px",
-            border: "1px solid #c3e6cb"
           }}>
-            <p style={{ margin: 0, color: "#155724" }}>AI response: {backendResponse.message}</p>
-          </div>
-        )}
-        
-        {game.isCheckmate() && (
-          <div style={{ marginTop: "20px", padding: "15px", backgroundColor: "#f8d7da", borderRadius: "8px", border: "1px solid #f5c6cb" }}>
-            <h3 style={{ margin: "0 0 10px 0", color: "#721c24" }}>
-              Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins! 🎉
-            </h3>
-          </div>
-        )}
-        
-        {game.isStalemate() && (
-          <div style={{ marginTop: "20px", padding: "15px", backgroundColor: "#fff3cd", borderRadius: "8px", border: "1px solid #ffeaa7" }}>
-            <h3 style={{ margin: "0 0 10px 0", color: "#856404" }}>
-              Stalemate! Game is a draw. 🤝
-            </h3>
-          </div>
-        )}
+            Back to Setup
+          </button>
+          
+          <p style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
+            Current FEN: {game.fen()}
+          </p>
+
+          {isLoading && <p style={{ color: '#007bff', fontWeight: 'bold', marginTop: '10px' }}>
+            Waiting for AI move...
+          </p>}
+          
+          {backendError && <p style={{ color: "red", marginTop: '10px' }}>
+            Error: {backendError}
+          </p>}
+          
+          {backendResponse && (
+            <div style={{ 
+              marginTop: "15px", 
+              padding: "10px", 
+              backgroundColor: "#d4edda", 
+              borderRadius: "8px",
+              border: "1px solid #c3e6cb"
+            }}>
+              <p style={{ margin: 0, color: "#155724" }}>
+                AI response: {backendResponse.message}
+              </p>
+            </div>
+          )}
+          
+          {game.isCheckmate() && (
+            <div style={{ 
+              marginTop: "15px", 
+              padding: "15px", 
+              backgroundColor: "#f8d7da", 
+              borderRadius: "8px", 
+              border: "1px solid #f5c6cb" 
+            }}>
+              <h3 style={{ margin: "0", color: "#721c24" }}>
+                Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins! 🎉
+              </h3>
+            </div>
+          )}
+          
+          {game.isStalemate() && (
+            <div style={{ 
+              marginTop: "15px", 
+              padding: "15px", 
+              backgroundColor: "#fff3cd", 
+              borderRadius: "8px", 
+              border: "1px solid #ffeaa7" 
+            }}>
+              <h3 style={{ margin: "0", color: "#856404" }}>
+                Stalemate! Game is a draw. 🤝
+              </h3>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
