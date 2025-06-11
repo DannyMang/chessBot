@@ -35,6 +35,9 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
   const [backendError, setBackendError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
+  const [moveFrom, setMoveFrom] = useState<string>('');
+  const [moveTo, setMoveTo] = useState<string>('');
+  const [showPromotionDialog, setShowPromotionDialog] = useState<boolean>(false);
 
   // Initialize game based on player color
   useEffect(() => {
@@ -79,13 +82,32 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
       console.log("Backend response:", result);
       setBackendResponse(result);
 
+      // Handle game over states from backend
+      if (result.game_over || result.game_state?.is_game_over) {
+        console.log("Game Over:", result.game_state?.result || result.message);
+        return; // Don't make a move if game is over
+      }
+
       // If the backend sent a move, apply it
       if (result.next_move) {
         makeMove({
           from: result.next_move.from,
           to: result.next_move.to,
           promotion: result.next_move.promotion || "q",
+          isAiMove: true // Mark as AI move to prevent sending back to backend
         });
+        
+        // Log game state after AI move
+        if (result.game_state) {
+          const { is_check, is_checkmate, is_stalemate, result: gameResult } = result.game_state;
+          if (is_checkmate) {
+            console.log("🎯 CHECKMATE:", gameResult);
+          } else if (is_stalemate) {
+            console.log("🤝 STALEMATE:", gameResult);
+          } else if (is_check) {
+            console.log("⚠️ CHECK: Player is in check");
+          }
+        }
       }
     } catch (error) {
       console.error("Error sending data to backend:", error);
@@ -143,6 +165,26 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
     [game, onMove],
   );
 
+  // Handle promotion piece selection
+  function onPromotionPieceSelect(piece?: string) {
+    // Make the promotion move
+    if (moveFrom && moveTo && piece) {
+      const move = makeMove({
+        from: moveFrom,
+        to: moveTo,
+        promotion: piece[1].toLowerCase(), // Extract piece type (q, r, b, n)
+        isAiMove: false,
+      });
+      
+      setMoveFrom('');
+      setMoveTo('');
+      setShowPromotionDialog(false);
+      
+      return move !== null;
+    }
+    return false;
+  }
+
   function onDrop(sourceSquare: string, targetSquare: string) {
     // Check if it's the player's turn
     const isPlayerTurn = (playerColor === 'white' && game.turn() === 'w') || 
@@ -152,10 +194,92 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
       return false; // Not player's turn
     }
 
+    // Check for king-onto-rook castling
+    const piece = game.get(sourceSquare as any);
+    const targetPiece = game.get(targetSquare as any);
+    
+    // If dragging king onto rook, convert to castling move
+    if (piece && piece.type === 'k' && targetPiece && targetPiece.type === 'r' && piece.color === targetPiece.color) {
+      console.log("🏰 King-onto-rook castling detected!");
+      
+      // Determine castling type and target square
+      let castlingTargetSquare: string | undefined;
+      if (piece.color === 'w') {
+        // White castling
+        if (targetSquare === 'h1') {
+          castlingTargetSquare = 'g1'; // Kingside
+          console.log("🏰 White kingside castling: e1 -> g1");
+        } else if (targetSquare === 'a1') {
+          castlingTargetSquare = 'c1'; // Queenside  
+          console.log("🏰 White queenside castling: e1 -> c1");
+        }
+      } else {
+        // Black castling
+        if (targetSquare === 'h8') {
+          castlingTargetSquare = 'g8'; // Kingside
+          console.log("🏰 Black kingside castling: e8 -> g8");
+        } else if (targetSquare === 'a8') {
+          castlingTargetSquare = 'c8'; // Queenside
+          console.log("🏰 Black queenside castling: e8 -> c8");
+        }
+      }
+      
+      if (castlingTargetSquare) {
+        // Try the castling move with proper target square
+        const possibleMoves = game.moves({ verbose: true });
+        const castlingMove = castlingTargetSquare ? possibleMoves.find(move => 
+          move.from === sourceSquare && move.to === castlingTargetSquare && 
+          (move.flags.includes('k') || move.flags.includes('q'))
+        ) : null;
+        
+        if (castlingMove) {
+          console.log("✅ Valid castling move found");
+          const move = makeMove({
+            from: sourceSquare,
+            to: castlingTargetSquare,
+            promotion: null,
+            isAiMove: false,
+          });
+          return move !== null;
+        } else {
+          console.log("❌ Castling not allowed");
+          return false;
+        }
+      }
+    }
+
+    // Regular move handling (non-castling)
+    // Try to find the exact move including special moves
+    const possibleMoves = game.moves({ verbose: true });
+    const attemptedMove = possibleMoves.find(move => 
+      move.from === sourceSquare && move.to === targetSquare
+    );
+
+    if (!attemptedMove) {
+      console.log(`Invalid move attempted: ${sourceSquare} -> ${targetSquare}`);
+      return false; // Invalid move
+    }
+
+    // Log the move type for debugging
+    if (attemptedMove.flags.includes('k')) {
+      console.log("🏰 Kingside castling detected");
+    } else if (attemptedMove.flags.includes('q')) {
+      console.log("🏰 Queenside castling detected");
+    } else if (attemptedMove.flags.includes('e')) {
+      console.log("👻 En passant capture detected");
+    } else if (attemptedMove.flags.includes('p')) {
+      console.log("👑 Pawn promotion detected");
+      // Store the move for promotion dialog
+      setMoveFrom(sourceSquare);
+      setMoveTo(targetSquare);
+      setShowPromotionDialog(true);
+      return true; // Return true to allow the move to proceed to promotion selection
+    }
+
     const move = makeMove({
       from: sourceSquare,
       to: targetSquare,
-      promotion: "q", // always promote to queen for simplicity
+      promotion: attemptedMove.promotion || "q", // Use actual promotion or default to queen
       isAiMove: false, // flag to indicate this is a player move
     });
 
@@ -210,6 +334,7 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
             onPieceDrop={onDrop} 
             boardWidth={580}
             boardOrientation={playerColor}
+            onPromotionPieceSelect={onPromotionPieceSelect}
           />
         </div>
         
@@ -248,55 +373,61 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
             Current FEN: {game.fen()}
           </p>
 
-          {isLoading && <p style={{ color: '#007bff', fontWeight: 'bold', marginTop: '10px' }}>
-            Waiting for AI move...
-          </p>}
+          {/* Reserve consistent space for loading/response messages */}
+          <div style={{ minHeight: '60px', marginTop: '10px' }}>
+            {isLoading && <p style={{ color: '#007bff', fontWeight: 'bold', margin: '10px 0' }}>
+              Waiting for AI move...
+            </p>}
+            
+            {backendError && <p style={{ color: "red", margin: '10px 0' }}>
+              Error: {backendError}
+            </p>}
+            
+            {backendResponse && !isLoading && !backendError && (
+              <div style={{ 
+                padding: "10px", 
+                backgroundColor: "#d4edda", 
+                borderRadius: "8px",
+                border: "1px solid #c3e6cb",
+                margin: '10px 0'
+              }}>
+                <p style={{ margin: 0, color: "#155724" }}>
+                  AI response: {backendResponse.message}
+                </p>
+              </div>
+            )}
+          </div>
           
-          {backendError && <p style={{ color: "red", marginTop: '10px' }}>
-            Error: {backendError}
-          </p>}
-          
-          {backendResponse && (
-            <div style={{ 
-              marginTop: "15px", 
-              padding: "10px", 
-              backgroundColor: "#d4edda", 
-              borderRadius: "8px",
-              border: "1px solid #c3e6cb"
-            }}>
-              <p style={{ margin: 0, color: "#155724" }}>
-                AI response: {backendResponse.message}
-              </p>
-            </div>
-          )}
-          
-          {game.isCheckmate() && (
-            <div style={{ 
-              marginTop: "15px", 
-              padding: "15px", 
-              backgroundColor: "#f8d7da", 
-              borderRadius: "8px", 
-              border: "1px solid #f5c6cb" 
-            }}>
-              <h3 style={{ margin: "0", color: "#721c24" }}>
-                Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins! 🎉
-              </h3>
-            </div>
-          )}
-          
-          {game.isStalemate() && (
-            <div style={{ 
-              marginTop: "15px", 
-              padding: "15px", 
-              backgroundColor: "#fff3cd", 
-              borderRadius: "8px", 
-              border: "1px solid #ffeaa7" 
-            }}>
-              <h3 style={{ margin: "0", color: "#856404" }}>
-                Stalemate! Game is a draw. 🤝
-              </h3>
-            </div>
-          )}
+          {/* Game over messages - separate fixed space */}
+          <div style={{ minHeight: '80px', marginTop: '5px' }}>
+            {game.isCheckmate() && (
+              <div style={{ 
+                padding: "15px", 
+                backgroundColor: "#f8d7da", 
+                borderRadius: "8px", 
+                border: "1px solid #f5c6cb",
+                margin: '10px 0'
+              }}>
+                <h3 style={{ margin: "0", color: "#721c24" }}>
+                  Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins! 🎉
+                </h3>
+              </div>
+            )}
+            
+            {game.isStalemate() && (
+              <div style={{ 
+                padding: "15px", 
+                backgroundColor: "#fff3cd", 
+                borderRadius: "8px", 
+                border: "1px solid #ffeaa7",
+                margin: '10px 0'
+              }}>
+                <h3 style={{ margin: "0", color: "#856404" }}>
+                  Stalemate! Game is a draw. 🤝
+                </h3>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>
