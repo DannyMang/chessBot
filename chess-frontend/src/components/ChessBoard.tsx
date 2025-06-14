@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 
@@ -292,6 +292,33 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
     }
   }, [backendResponse]);
 
+  // Compute custom square styles for check
+  const customSquareStyles = useMemo(() => {
+    if (!game.isCheck()) return {};
+    // Find the king's square
+    const turn = game.turn();
+    const board = game.board();
+    let kingSquare = '';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const piece = board[r][c];
+        if (piece && piece.type === 'k' && piece.color === turn) {
+          // Convert to algebraic square
+          kingSquare = String.fromCharCode(97 + c) + (8 - r);
+        }
+      }
+    }
+    if (kingSquare) {
+      return {
+        [kingSquare]: {
+          background: 'radial-gradient(circle, #ff4d4d 60%, transparent 100%)',
+          boxShadow: '0 0 20px 5px #ff4d4d',
+        }
+      };
+    }
+    return {};
+  }, [game]);
+
   return (
     <>
       {/* Background Layer - Completely Separate */}
@@ -335,6 +362,7 @@ export default function ChessBoard({ onMove, playerColor, onBackToSetup }: Chess
             boardWidth={580}
             boardOrientation={playerColor}
             onPromotionPieceSelect={onPromotionPieceSelect}
+            customSquareStyles={customSquareStyles}
           />
         </div>
         
