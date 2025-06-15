@@ -31,6 +31,17 @@ class ChessBot:
             return None
         
         move = random.choice(legal_moves)
+        
+        # Log what type of move the AI is considering
+        if self.board.is_kingside_castling(move):
+            print("🤖 AI considering kingside castling")
+        elif self.board.is_queenside_castling(move):
+            print("🤖 AI considering queenside castling")
+        elif self.board.is_en_passant(move):
+            print("🤖 AI considering en passant")
+        elif move.promotion:
+            print(f"🤖 AI considering pawn promotion to {move.promotion}")
+        
         return {
             "from": str(move)[:2],
             "to": str(move)[2:4],
@@ -80,11 +91,58 @@ def handle_move():
                 "message": "Failed to update board state"
             }), 400
         
+        # Log the player's move details
+        if move_from and move_to:
+            try:
+                player_move_str = move_from + move_to
+                if promotion:
+                    player_move_str += promotion
+                player_move = chess.Move.from_uci(player_move_str)
+                
+                # Check if it's a special move
+                if bot.board.is_kingside_castling(player_move):
+                    print("🏰 Player performed kingside castling")
+                elif bot.board.is_queenside_castling(player_move):
+                    print("🏰 Player performed queenside castling")
+                elif bot.board.is_en_passant(player_move):
+                    print("👻 Player performed en passant")
+                elif promotion:
+                    print(f"👑 Player promoted pawn to {promotion}")
+                else:
+                    print(f"♟️  Regular move: {move_from} -> {move_to}")
+                    
+            except Exception as e:
+                print(f"Could not analyze player move: {e}")
+        
         # Check if game is over
         if is_checkmate or is_stalemate:
             return jsonify({
                 "message": "Game is over",
                 "game_over": True
+            })
+        
+        # Check if AI is in checkmate or stalemate before making a move
+        if bot.board.is_checkmate():
+            winner = "White" if bot.board.turn == chess.BLACK else "Black"
+            return jsonify({
+                "message": f"Checkmate! {winner} wins!",
+                "game_over": True,
+                "game_state": {
+                    "is_checkmate": True,
+                    "is_stalemate": False,
+                    "result": f"Checkmate! {winner} wins!"
+                }
+            })
+        
+        if bot.board.is_stalemate():
+            return jsonify({
+                "message": "Stalemate! Game is a draw.",
+                "game_over": True,
+                "game_state": {
+                    "is_checkmate": False,
+                    "is_stalemate": True,
+                    "result": "Stalemate! Game is a draw."
+                }
             })
         
         # Get AI move
@@ -106,11 +164,43 @@ def handle_move():
             if move in bot.board.legal_moves:
                 bot.board.push(move)
                 
-                return jsonify({
+                # Check game state after AI move
+                is_check_after_ai = bot.board.is_check()
+                is_checkmate_after_ai = bot.board.is_checkmate()
+                is_stalemate_after_ai = bot.board.is_stalemate()
+                is_game_over = is_checkmate_after_ai or is_stalemate_after_ai
+                
+                # Determine game result
+                game_result = None
+                if is_checkmate_after_ai:
+                    winner = "Black" if bot.board.turn == chess.WHITE else "White"
+                    game_result = f"Checkmate! {winner} wins!"
+                elif is_stalemate_after_ai:
+                    game_result = "Stalemate! Game is a draw."
+                
+                response = {
                     "next_move": ai_move,
                     "message": "AI move successful",
-                    "new_fen": bot.board.fen()
-                })
+                    "new_fen": bot.board.fen(),
+                    "game_state": {
+                        "is_check": is_check_after_ai,
+                        "is_checkmate": is_checkmate_after_ai,
+                        "is_stalemate": is_stalemate_after_ai,
+                        "is_game_over": is_game_over,
+                        "result": game_result,
+                        "turn": "white" if bot.board.turn == chess.WHITE else "black"
+                    }
+                }
+                
+                # Log game state
+                if is_game_over:
+                    print(f"🎯 GAME OVER: {game_result}")
+                elif is_check_after_ai:
+                    print(f"⚠️  CHECK: {'White' if bot.board.turn == chess.WHITE else 'Black'} is in check")
+                else:
+                    print(f"✅ Move successful. Turn: {'White' if bot.board.turn == chess.WHITE else 'Black'}")
+                
+                return jsonify(response)
             else:
                 print(f"Illegal move generated: {move_str}")
                 return jsonify({
