@@ -1,24 +1,12 @@
 # Chess Bot Tiny Backend
 
-A minimal Python Flask server for handling chess moves and integrating with RL models.
+using tinygrad to write this chess engine
 
 ## Quick Start
 
-1. **Setup the environment:**
-   ```bash
-   chmod +x setup.sh
-   ./setup.sh
-   ```
+to -do later
 
-2. **Start the server:**
-   ```bash
-   source venv/bin/activate
-   python server.py
-   ```
-
-3. **Server will run on:** `http://localhost:8080`
-
-## API Endpoints
+## API Endpoints, helpful stuff
 
 ### `POST /api/move`
 Receives chess moves from frontend and returns AI move.
@@ -80,25 +68,3 @@ def get_best_move(self):
         "promotion": best_move.promotion
     }
 ```
-
-## Features
-
-- ✅ **CORS enabled** for frontend communication
-- ✅ **FEN string handling** for board state
-- ✅ **Move validation** using python-chess
-- ✅ **Error handling** for invalid moves
-- ✅ **Logging** for debugging
-- ✅ **Random move baseline** (replace with your RL model)
-
-## Dependencies
-
-- Flask: Web server framework
-- Flask-CORS: Cross-origin resource sharing
-- python-chess: Chess game logic and validation
-- requests: HTTP client library
-
-## Development
-
-The server runs in debug mode, so changes to `server.py` will automatically reload the server.
-
-Your frontend at `http://localhost:3000` should now be able to communicate with this backend! 
