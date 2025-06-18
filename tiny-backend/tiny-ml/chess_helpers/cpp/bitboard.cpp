@@ -40,10 +40,76 @@ class Bitboard {
         uint64_t black_queens;
         uint64_t black_king;
 
-        // Fast C++ move generation
-    std::vector<Move> generateLegalMoves();
-    void makeMove(const Move& move);
-    bool isLegal(const Move& move);
+        bool white_to_move;
+        uint64_t castling_rights;
+        uint64_t en_passant_square;
+        int halfmove_clock;
+        int fullmove_number;
+
+        // construtor
+        Bitboard() {
+            white_pawns = 0;
+            white_knights = 0;
+            white_bishops = 0;
+            white_rooks = 0;
+            white_queens = 0;
+            white_king = 0;
+            black_pawns = 0;
+            black_knights = 0;
+            black_bishops = 0;
+            black_rooks = 0;
+            black_queens = 0;
+            black_king = 0;
+            white_to_move = true;
+            //4 possible castling rights ( queen side, king side on both sides, so we use 4 bits)
+            castling_rights = 0b1111; 
+            en_passant_square = 0;
+            //halfmove clock is the number of halfmoves since the last capture or pawn move
+            halfmove_clock = 0;
+            //fullmove number is the number of full moves since the beginning of the game
+            fullmove_number = 1;
+        }
+
+        // get white pieces, use bitwise OR.
+        uint64_t getWhitePieces() const {
+           return white_pawns | white_knights | white_bishops | white_rooks | white_queens | white_king;
+        }
+
+        // get black pieces
+        uint64_t getBlackPieces() const {
+            return black_pawns | black_knights | black_bishops | black_rooks | black_queens | black_king;
+        }
+
+        uint64_t getAllPieces() const {
+            return getWhitePieces() | getBlackPieces();
+        }
+
+        // set starting position
+        // remember there are 64 squares, so we use 64 bits to represent the board
+        // easy to represent with hexadecimal representation
+        void setStartingPosition() {
+            white_pawns = 0x000000000000FF00ULL;
+            white_rooks = 0x0000000000000081ULL;
+            white_knights = 0x0000000000000042ULL;
+            white_bishops = 0x0000000000000024ULL;
+            white_queens = 0x0000000000000008ULL;
+            white_king = 0x0000000000000010ULL;
+            
+            // Black pieces
+            black_pawns = 0x00FF000000000000ULL;
+            black_rooks = 0x8100000000000000ULL;
+            black_knights = 0x4200000000000000ULL;
+            black_bishops = 0x2400000000000000ULL;
+            black_queens = 0x0800000000000000ULL;
+            black_king = 0x1000000000000000ULL;
+
+            white_to_move = true;
+            castling_rights = 0b1111;
+            en_passant_square = -1;
+            halfmove_clock = 0;
+            fullmove_number = 1;
+        }
+
 };
 
 // Python binding
