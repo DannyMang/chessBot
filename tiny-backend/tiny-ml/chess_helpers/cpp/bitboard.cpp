@@ -1,6 +1,10 @@
 #include "bitboard.h"
 #include <algorithm>
 
+
+extern "C" {
+    #include "magicmoves.h"
+}
 ChessBitboard::ChessBitboard() {
     // Initialize all bitboards to 0
     white_pawns = white_knights = white_bishops = 0;
@@ -21,7 +25,7 @@ ChessBitboard::ChessBitboard() {
     }
     
     // Initialize magic bitboards
-    MagicMoves::init();
+    initmagicmoves();
 }
 
 Bitboard ChessBitboard::getWhitePieces() const {
@@ -90,13 +94,13 @@ void ChessBitboard::clearSquare(Square square) {
 Bitboard ChessBitboard::getAttacks(Square square, PieceType piece_type, Bitboard occupancy) const {
     switch (piece_type) {
         case ROOK:
-            return MagicMoves::getRookAttacks(square, occupancy);
+            return Rmagic(square, occupancy);
         case BISHOP:
-            return MagicMoves::getBishopAttacks(square, occupancy);
+            return Bmagic(square, occupancy);
         case QUEEN:
-            return MagicMoves::getQueenAttacks(square, occupancy);
+            return Qmagic(square, occupancy);
         default:
-            return 0ULL; // Handle other pieces separately
+            return 0ULL;
     }
 }
 
@@ -114,7 +118,7 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         Square from = __builtin_ctzll(pieces); // Get LSB
         pieces &= pieces - 1; // Clear LSB
         
-        Bitboard attacks = MagicMoves::getRookAttacks(from, occupancy);
+        Bitboard attacks = Rmagic(from, occupancy);
         attacks &= ~friendly; // Can't capture own pieces
         
         while (attacks) {
@@ -130,7 +134,7 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         Square from = __builtin_ctzll(pieces);
         pieces &= pieces - 1;
         
-        Bitboard attacks = MagicMoves::getBishopAttacks(from, occupancy);
+        Bitboard attacks = Bmagic(from, occupancy);
         attacks &= ~friendly;
         
         while (attacks) {
@@ -146,7 +150,7 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         Square from = __builtin_ctzll(pieces);
         pieces &= pieces - 1;
         
-        Bitboard attacks = MagicMoves::getQueenAttacks(from, occupancy);
+        Bitboard attacks = Qmagic(from, occupancy);
         attacks &= ~friendly;
         
         while (attacks) {
@@ -156,9 +160,73 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         }
     }
     
-    // TODO: Add pawn, knight, king moves
+    generatePawnMoves(moves);
+    generateKnightMoves(moves);
+    generateKingMoves(moves);
     
     return moves;
+}
+void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
+    // TO-DO double check this method 
+    Bitboard pawns = white_to_move ? white_pawns : black_pawns;
+    int direction = white_to_move ? 8 : -8;
+    
+    while (pawns) {
+        Square from = __builtin_ctzll(pawns);
+        pawns &= pawns - 1;
+        
+        Square to = from + direction;
+        if (to >= 0 && to < 64 && getPieceAt(to).is_empty()) {
+            moves.emplace_back(from, to, PAWN);
+        }
+    }
+}
+
+void ChessBitboard::generateKnightMoves(std::vector<Move>& moves) const {
+    // TO-DO double check this method (ai generated)
+    static const int knight_moves[8] = {-17, -15, -10, -6, 6, 10, 15, 17};
+    
+    Bitboard knights = white_to_move ? white_knights : black_knights;
+    Bitboard friendly = white_to_move ? getWhitePieces() : getBlackPieces();
+    
+    while (knights) {
+        Square from = __builtin_ctzll(knights);
+        knights &= knights - 1;
+        
+        for (int offset : knight_moves) {
+            Square to = from + offset;
+            if (to >= 0 && to < 64 && !(friendly & (1ULL << to))) {
+                // Check if move is valid (not wrapping around board)
+                int from_file = from % 8;
+                int to_file = to % 8;
+                if (abs(from_file - to_file) <= 2) {
+                    moves.emplace_back(from, to, KNIGHT);
+                }
+            }
+        }
+    }
+}
+
+void ChessBitboard::generateKingMoves(std::vector<Move>& moves) const {
+    // TO-DO double check this method (ai generated)
+    static const int king_moves[8] = {-9, -8, -7, -1, 1, 7, 8, 9};
+    
+    Bitboard king = white_to_move ? white_king : black_king;
+    Bitboard friendly = white_to_move ? getWhitePieces() : getBlackPieces();
+    
+    Square from = __builtin_ctzll(king);
+    
+    for (int offset : king_moves) {
+        Square to = from + offset;
+        if (to >= 0 && to < 64 && !(friendly & (1ULL << to))) {
+            // Check if move is valid (not wrapping around board)
+            int from_file = from % 8;
+            int to_file = to % 8;
+            if (abs(from_file - to_file) <= 1) {
+                moves.emplace_back(from, to, KING);
+            }
+        }
+    }
 }
 
 std::vector<Move> ChessBitboard::generateLegalMoves() const {
@@ -176,12 +244,12 @@ std::vector<Move> ChessBitboard::generateLegalMoves() const {
 }
 
 void ChessBitboard::makeMove(const Move& move) {
-    Piece moving_piece = getPieceAt(move.from());
-    Piece captured_piece = getPieceAt(move.to());
+    Piece moving_piece = getPieceAt(move.getFrom());
+    Piece captured_piece = getPieceAt(move.getTo());
     
     // Move the piece
-    clearSquare(move.from());
-    setPiece(move.to(), moving_piece);
+    clearSquare(move.getFrom());
+    setPiece(move.getTo(), moving_piece);
     
     // Update game state
     white_to_move = !white_to_move;
@@ -193,19 +261,58 @@ void ChessBitboard::makeMove(const Move& move) {
 }
 
 bool ChessBitboard::isLegal(const Move& move) const {
-    // Create a copy and make the move
+     // Simple legality check - implement properly later
     ChessBitboard temp = *this;
     temp.makeMove(move);
     
     // Check if our king is in check after the move
-    Bitboard king_bb = white_to_move ? temp.white_king : temp.black_king;
-    Square king_square = __builtin_ctzll(king_bb);
-    
-    // TODO: Check if king is attacked by opponent pieces
-    // This requires implementing attack generation for all piece types
-    
-    return true; // Placeholder - implement proper check detection
+    Color our_color = white_to_move ? WHITE : BLACK;
+    return !temp.isInCheck(our_color);
 }
+
+bool ChessBitboard::isInCheck(Color color) const {
+    Bitboard king_bb = (color == WHITE) ? white_king : black_king;
+    Square king_square = __builtin_ctzll(king_bb);
+    Color enemy_color = (color == WHITE) ? BLACK : WHITE;
+    
+    return isSquareAttacked(king_square, enemy_color);
+}
+bool ChessBitboard::isSquareAttacked(Square square, Color by_color) const {
+    // Simple attack detection - implement properly later
+    Bitboard occupancy = getAllPieces();
+    
+    // Check for rook/queen attacks
+    Bitboard rook_attacks = Rmagic(square, occupancy);
+    Bitboard enemy_rooks_queens = (by_color == WHITE) ? 
+        (white_rooks | white_queens) : (black_rooks | black_queens);
+    if (rook_attacks & enemy_rooks_queens) return true;
+    
+    // Check for bishop/queen attacks  
+    Bitboard bishop_attacks = Bmagic(square, occupancy);
+    Bitboard enemy_bishops_queens = (by_color == WHITE) ? 
+        (white_bishops | white_queens) : (black_bishops | black_queens);
+    if (bishop_attacks & enemy_bishops_queens) return true;
+    
+    // TODO: Check for pawn, knight, king attacks
+    return false;
+}
+
+uint64_t ChessBitboard::perft(int depth) const {
+    if (depth == 0) return 1;
+    
+    uint64_t nodes = 0;
+    auto moves = generateLegalMoves();
+    
+    for (const Move& move : moves) {
+        ChessBitboard temp = *this;
+        temp.makeMove(move);
+        nodes += temp.perft(depth - 1);
+    }
+    
+    return nodes;
+}
+
+
 
 // Helper methods
 void ChessBitboard::updateMailbox() {

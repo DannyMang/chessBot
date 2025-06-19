@@ -17,7 +17,7 @@ struct Move {
         : from_square(from), to_square(to), piece_type(piece), capture_piece(0),
           is_promotion(false), promotion_piece(0) {}
 
-    Square from() const { return from_square; }
-    Square to() const { return to_square; }
+    Square getFrom() const { return from_square; }
+    Square getTo() const { return to_square; }
 
 };

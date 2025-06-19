@@ -60,4 +60,16 @@ private:
     void updateMailbox();
     void removePieceFromBitboard(Square square, Piece piece);
     void addPieceToBitboard(Square square, Piece piece);
+
+    // Helper methods for move generation
+    void generatePawnMoves(std::vector<Move>& moves) const;
+    void generateKnightMoves(std::vector<Move>& moves) const;
+    void generateKingMoves(std::vector<Move>& moves) const;
+    
+    // Check detection
+    bool isSquareAttacked(Square square, Color by_color) const;
+    bool isInCheck(Color color) const;
+
+    // Performance testing
+    uint64_t perft(int depth) const;
 };
