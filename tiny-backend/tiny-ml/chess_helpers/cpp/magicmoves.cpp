@@ -27,7 +27,9 @@
  *3. This notice may not be removed or altered from any source distribution.
  */
 
+extern "C" {
 #include "magicmoves.h"
+}
 
 #ifdef _MSC_VER
 	#pragma message("MSC compatible compiler detected -- turning off warning 4312,4146")

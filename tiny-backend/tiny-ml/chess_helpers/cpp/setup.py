@@ -5,7 +5,7 @@ ext_modules = [
     Pybind11Extension(
         "chess_engine",
         [
-            "magicmoves.c",           # Add the magic moves implementation
+            "magicmoves.cpp",         # Renamed from .c to .cpp
             "bitboard.cpp",
             "python_bindings.cpp"
         ],

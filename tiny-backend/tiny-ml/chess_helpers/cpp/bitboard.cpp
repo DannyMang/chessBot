@@ -1,10 +1,7 @@
 #include "bitboard.h"
 #include <algorithm>
+#include "magicmoves.h"
 
-
-extern "C" {
-    #include "magicmoves.h"
-}
 ChessBitboard::ChessBitboard() {
     // Initialize all bitboards to 0
     white_pawns = white_knights = white_bishops = 0;
