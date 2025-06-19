@@ -42,7 +42,7 @@ class Bitboard {
 
         bool white_to_move;
         uint64_t castling_rights;
-        uint64_t en_passant_square;
+        int en_passant_square;
         int halfmove_clock;
         int fullmove_number;
 
@@ -63,7 +63,7 @@ class Bitboard {
             white_to_move = true;
             //4 possible castling rights ( queen side, king side on both sides, so we use 4 bits)
             castling_rights = 0b1111; 
-            en_passant_square = 0;
+            en_passant_square = -1;
             //halfmove clock is the number of halfmoves since the last capture or pawn move
             halfmove_clock = 0;
             //fullmove number is the number of full moves since the beginning of the game
