@@ -1,6 +1,5 @@
 #pragma once
 #include <cstdint>
-#include "types.h"
 
 class Piece {
 private:
@@ -16,11 +15,12 @@ public:
     };
     
     enum Color : uint8_t {
-        WHITE = 0, BLACK = 8
+        WHITE = 0, BLACK = 8 // Use 8 for the color bit
     };
-    
+
     constexpr Piece() : data(0) {}
-    constexpr Piece(Color color, Type type) : data(color | type) {}
+    // The constructor now uses the inner enums
+    constexpr Piece(Color color, Type type) : data(static_cast<uint8_t>(color) | static_cast<uint8_t>(type)) {}
     
     constexpr Type type() const { return Type(data & TYPE_MASK); }
     constexpr Color color() const { return Color(data & COLOR_MASK); }

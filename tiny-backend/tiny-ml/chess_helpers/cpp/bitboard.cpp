@@ -88,13 +88,13 @@ void ChessBitboard::clearSquare(Square square) {
     mailbox[square] = Piece();
 }
 
-Bitboard ChessBitboard::getAttacks(Square square, PieceType piece_type, Bitboard occupancy) const {
+Bitboard ChessBitboard::getAttacks(Square square, Piece::Type piece_type, Bitboard occupancy) const {
     switch (piece_type) {
-        case ROOK:
+        case Piece::Type::ROOK:
             return Rmagic(square, occupancy);
-        case BISHOP:
+        case Piece::Type::BISHOP:
             return Bmagic(square, occupancy);
-        case QUEEN:
+        case Piece::Type::QUEEN:
             return Qmagic(square, occupancy);
         default:
             return 0ULL;
@@ -121,7 +121,7 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         while (attacks) {
             Square to = __builtin_ctzll(attacks);
             attacks &= attacks - 1;
-            moves.emplace_back(from, to, ROOK);
+            moves.emplace_back(from, to, Piece::Type::ROOK);
         }
     }
     
@@ -137,7 +137,7 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         while (attacks) {
             Square to = __builtin_ctzll(attacks);
             attacks &= attacks - 1;
-            moves.emplace_back(from, to, BISHOP);
+            moves.emplace_back(from, to, Piece::Type::BISHOP);
         }
     }
     
@@ -153,7 +153,7 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
         while (attacks) {
             Square to = __builtin_ctzll(attacks);
             attacks &= attacks - 1;
-            moves.emplace_back(from, to, QUEEN);
+            moves.emplace_back(from, to, Piece::Type::QUEEN);
         }
     }
     
@@ -164,17 +164,27 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
     return moves;
 }
 void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
-    // TO-DO double check this method 
     Bitboard pawns = white_to_move ? white_pawns : black_pawns;
     int direction = white_to_move ? 8 : -8;
-    
+    int start_rank_mask = white_to_move ? 1 : 6;
+
     while (pawns) {
         Square from = __builtin_ctzll(pawns);
         pawns &= pawns - 1;
         
+        // Single push
         Square to = from + direction;
         if (to >= 0 && to < 64 && getPieceAt(to).is_empty()) {
-            moves.emplace_back(from, to, PAWN);
+            moves.emplace_back(from, to, Piece::Type::PAWN);
+
+            // Double push from starting rank
+            bool is_on_start_rank = (from / 8 == start_rank_mask);
+            if (is_on_start_rank) {
+                Square double_to = from + 2 * direction;
+                if (double_to >= 0 && double_to < 64 && getPieceAt(double_to).is_empty()) {
+                    moves.emplace_back(from, double_to, Piece::Type::PAWN);
+                }
+            }
         }
     }
 }
@@ -197,7 +207,7 @@ void ChessBitboard::generateKnightMoves(std::vector<Move>& moves) const {
                 int from_file = from % 8;
                 int to_file = to % 8;
                 if (abs(from_file - to_file) <= 2) {
-                    moves.emplace_back(from, to, KNIGHT);
+                    moves.emplace_back(from, to, Piece::Type::KNIGHT);
                 }
             }
         }
@@ -220,7 +230,7 @@ void ChessBitboard::generateKingMoves(std::vector<Move>& moves) const {
             int from_file = from % 8;
             int to_file = to % 8;
             if (abs(from_file - to_file) <= 1) {
-                moves.emplace_back(from, to, KING);
+                moves.emplace_back(from, to, Piece::Type::KING);
             }
         }
     }
@@ -263,30 +273,30 @@ bool ChessBitboard::isLegal(const Move& move) const {
     temp.makeMove(move);
     
     // Check if our king is in check after the move
-    Color our_color = white_to_move ? WHITE : BLACK;
+    Piece::Color our_color = white_to_move ? Piece::Color::WHITE : Piece::Color::BLACK;
     return !temp.isInCheck(our_color);
 }
 
-bool ChessBitboard::isInCheck(Color color) const {
-    Bitboard king_bb = (color == WHITE) ? white_king : black_king;
+bool ChessBitboard::isInCheck(Piece::Color color) const {
+    Bitboard king_bb = (color == Piece::Color::WHITE) ? white_king : black_king;
     Square king_square = __builtin_ctzll(king_bb);
-    Color enemy_color = (color == WHITE) ? BLACK : WHITE;
+    Piece::Color enemy_color = (color == Piece::Color::WHITE) ? Piece::Color::BLACK : Piece::Color::WHITE;
     
     return isSquareAttacked(king_square, enemy_color);
 }
-bool ChessBitboard::isSquareAttacked(Square square, Color by_color) const {
+bool ChessBitboard::isSquareAttacked(Square square, Piece::Color by_color) const {
     // Simple attack detection - implement properly later
     Bitboard occupancy = getAllPieces();
     
     // Check for rook/queen attacks
     Bitboard rook_attacks = Rmagic(square, occupancy);
-    Bitboard enemy_rooks_queens = (by_color == WHITE) ? 
+    Bitboard enemy_rooks_queens = (by_color == Piece::Color::WHITE) ? 
         (white_rooks | white_queens) : (black_rooks | black_queens);
     if (rook_attacks & enemy_rooks_queens) return true;
     
     // Check for bishop/queen attacks  
     Bitboard bishop_attacks = Bmagic(square, occupancy);
-    Bitboard enemy_bishops_queens = (by_color == WHITE) ? 
+    Bitboard enemy_bishops_queens = (by_color == Piece::Color::WHITE) ? 
         (white_bishops | white_queens) : (black_bishops | black_queens);
     if (bishop_attacks & enemy_bishops_queens) return true;
     
@@ -322,42 +332,44 @@ void ChessBitboard::updateMailbox() {
     for (int square = 0; square < 64; square++) {
         Bitboard mask = 1ULL << square;
         
-        if (white_pawns & mask) mailbox[square] = Piece(Piece::WHITE, Piece::PAWN);
-        else if (white_knights & mask) mailbox[square] = Piece(Piece::WHITE, Piece::KNIGHT);
-        else if (white_bishops & mask) mailbox[square] = Piece(Piece::WHITE, Piece::BISHOP);
-        else if (white_rooks & mask) mailbox[square] = Piece(Piece::WHITE, Piece::ROOK);
-        else if (white_queens & mask) mailbox[square] = Piece(Piece::WHITE, Piece::QUEEN);
-        else if (white_king & mask) mailbox[square] = Piece(Piece::WHITE, Piece::KING);
+        if (white_pawns & mask) mailbox[square] = Piece(Piece::Color::WHITE, Piece::Type::PAWN);
+        else if (white_knights & mask) mailbox[square] = Piece(Piece::Color::WHITE, Piece::Type::KNIGHT);
+        else if (white_bishops & mask) mailbox[square] = Piece(Piece::Color::WHITE, Piece::Type::BISHOP);
+        else if (white_rooks & mask) mailbox[square] = Piece(Piece::Color::WHITE, Piece::Type::ROOK);
+        else if (white_queens & mask) mailbox[square] = Piece(Piece::Color::WHITE, Piece::Type::QUEEN);
+        else if (white_king & mask) mailbox[square] = Piece(Piece::Color::WHITE, Piece::Type::KING);
         
-        else if (black_pawns & mask) mailbox[square] = Piece(Piece::BLACK, Piece::PAWN);
-        else if (black_knights & mask) mailbox[square] = Piece(Piece::BLACK, Piece::KNIGHT);
-        else if (black_bishops & mask) mailbox[square] = Piece(Piece::BLACK, Piece::BISHOP);
-        else if (black_rooks & mask) mailbox[square] = Piece(Piece::BLACK, Piece::ROOK);
-        else if (black_queens & mask) mailbox[square] = Piece(Piece::BLACK, Piece::QUEEN);
-        else if (black_king & mask) mailbox[square] = Piece(Piece::BLACK, Piece::KING);
+        else if (black_pawns & mask) mailbox[square] = Piece(Piece::Color::BLACK, Piece::Type::PAWN);
+        else if (black_knights & mask) mailbox[square] = Piece(Piece::Color::BLACK, Piece::Type::KNIGHT);
+        else if (black_bishops & mask) mailbox[square] = Piece(Piece::Color::BLACK, Piece::Type::BISHOP);
+        else if (black_rooks & mask) mailbox[square] = Piece(Piece::Color::BLACK, Piece::Type::ROOK);
+        else if (black_queens & mask) mailbox[square] = Piece(Piece::Color::BLACK, Piece::Type::QUEEN);
+        else if (black_king & mask) mailbox[square] = Piece(Piece::Color::BLACK, Piece::Type::KING);
     }
 }
 
 void ChessBitboard::addPieceToBitboard(Square square, Piece piece) {
     Bitboard mask = 1ULL << square;
     
-    if (piece.color() == Piece::WHITE) {
+    if (piece.color() == Piece::Color::WHITE) {
         switch (piece.type()) {
-            case Piece::PAWN: white_pawns |= mask; break;
-            case Piece::KNIGHT: white_knights |= mask; break;
-            case Piece::BISHOP: white_bishops |= mask; break;
-            case Piece::ROOK: white_rooks |= mask; break;
-            case Piece::QUEEN: white_queens |= mask; break;
-            case Piece::KING: white_king |= mask; break;
+            case Piece::Type::PAWN: white_pawns |= mask; break;
+            case Piece::Type::KNIGHT: white_knights |= mask; break;
+            case Piece::Type::BISHOP: white_bishops |= mask; break;
+            case Piece::Type::ROOK: white_rooks |= mask; break;
+            case Piece::Type::QUEEN: white_queens |= mask; break;
+            case Piece::Type::KING: white_king |= mask; break;
+            case Piece::Type::NONE: break;
         }
     } else {
         switch (piece.type()) {
-            case Piece::PAWN: black_pawns |= mask; break;
-            case Piece::KNIGHT: black_knights |= mask; break;
-            case Piece::BISHOP: black_bishops |= mask; break;
-            case Piece::ROOK: black_rooks |= mask; break;
-            case Piece::QUEEN: black_queens |= mask; break;
-            case Piece::KING: black_king |= mask; break;
+            case Piece::Type::PAWN: black_pawns |= mask; break;
+            case Piece::Type::KNIGHT: black_knights |= mask; break;
+            case Piece::Type::BISHOP: black_bishops |= mask; break;
+            case Piece::Type::ROOK: black_rooks |= mask; break;
+            case Piece::Type::QUEEN: black_queens |= mask; break;
+            case Piece::Type::KING: black_king |= mask; break;
+            case Piece::Type::NONE: break;
         }
     }
 }
@@ -365,23 +377,25 @@ void ChessBitboard::addPieceToBitboard(Square square, Piece piece) {
 void ChessBitboard::removePieceFromBitboard(Square square, Piece piece) {
     Bitboard mask = ~(1ULL << square);
     
-    if (piece.color() == Piece::WHITE) {
+    if (piece.color() == Piece::Color::WHITE) {
         switch (piece.type()) {
-            case Piece::PAWN: white_pawns &= mask; break;
-            case Piece::KNIGHT: white_knights &= mask; break;
-            case Piece::BISHOP: white_bishops &= mask; break;
-            case Piece::ROOK: white_rooks &= mask; break;
-            case Piece::QUEEN: white_queens &= mask; break;
-            case Piece::KING: white_king &= mask; break;
+            case Piece::Type::PAWN: white_pawns &= mask; break;
+            case Piece::Type::KNIGHT: white_knights &= mask; break;
+            case Piece::Type::BISHOP: white_bishops &= mask; break;
+            case Piece::Type::ROOK: white_rooks &= mask; break;
+            case Piece::Type::QUEEN: white_queens &= mask; break;
+            case Piece::Type::KING: white_king &= mask; break;
+            case Piece::Type::NONE: break;
         }
     } else {
         switch (piece.type()) {
-            case Piece::PAWN: black_pawns &= mask; break;
-            case Piece::KNIGHT: black_knights &= mask; break;
-            case Piece::BISHOP: black_bishops &= mask; break;
-            case Piece::ROOK: black_rooks &= mask; break;
-            case Piece::QUEEN: black_queens &= mask; break;
-            case Piece::KING: black_king &= mask; break;
+            case Piece::Type::PAWN: black_pawns &= mask; break;
+            case Piece::Type::KNIGHT: black_knights &= mask; break;
+            case Piece::Type::BISHOP: black_bishops &= mask; break;
+            case Piece::Type::ROOK: black_rooks &= mask; break;
+            case Piece::Type::QUEEN: black_queens &= mask; break;
+            case Piece::Type::KING: black_king &= mask; break;
+            case Piece::Type::NONE: break;
         }
     }
 }

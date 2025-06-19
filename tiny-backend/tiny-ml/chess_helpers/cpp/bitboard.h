@@ -54,8 +54,14 @@ public:
     bool isLegal(const Move& move) const;
     
     // Attack generation using magic bitboards
-    Bitboard getAttacks(Square square, PieceType piece_type, Bitboard occupancy) const;
+    Bitboard getAttacks(Square square, Piece::Type piece_type, Bitboard occupancy) const;
     
+    // Check detection
+    bool isInCheck(Piece::Color color) const;
+
+    // Performance testing
+    uint64_t perft(int depth) const;
+
 private:
     void updateMailbox();
     void removePieceFromBitboard(Square square, Piece piece);
@@ -67,9 +73,5 @@ private:
     void generateKingMoves(std::vector<Move>& moves) const;
     
     // Check detection
-    bool isSquareAttacked(Square square, Color by_color) const;
-    bool isInCheck(Color color) const;
-
-    // Performance testing
-    uint64_t perft(int depth) const;
+    bool isSquareAttacked(Square square, Piece::Color by_color) const;
 };

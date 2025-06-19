@@ -1,8 +1,8 @@
-# Compiled files
-*.so
-
-# Build directory
+# Build artifacts
 build/
+*.so
+*.o
 
 # Python cache
-__pycache__/ 
+__pycache__/
+.pytest_cache/ 
