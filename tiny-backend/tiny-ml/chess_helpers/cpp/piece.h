@@ -1,4 +1,6 @@
+#pragma once
 #include <cstdint>
+#include "types.h"
 
 class Piece {
 private:
