@@ -1,3 +1,8 @@
+to-dos for 6/20
+- fen parsing to bitboard representation
+- confirm bitboard representation is accurate
+- start da rl 
+
 # Chess Bot Tiny Backend
 
 using tinygrad to write this chess engine
