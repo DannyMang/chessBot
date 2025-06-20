@@ -257,51 +257,94 @@ void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
             }
         }
     }
-}
+    
+    // 3. En Passant
+    if (en_passant_square != -1) {
+        // Get the square of the pawn that could be captured
+        Bitboard ep_capture_target = 1ULL << (white_to_move ? en_passant_square - 8 : en_passant_square + 8);
 
-void ChessBitboard::generateKnightMoves(std::vector<Move>& moves) const {
-    // TO-DO double check this method (ai generated)
-    static const int knight_moves[8] = {-17, -15, -10, -6, 6, 10, 15, 17};
-    
-    Bitboard knights = white_to_move ? white_knights : black_knights;
-    Bitboard friendly = white_to_move ? getWhitePieces() : getBlackPieces();
-    
-    while (knights) {
-        Square from = __builtin_ctzll(knights);
-        knights &= knights - 1;
-        
-        for (int offset : knight_moves) {
-            Square to = from + offset;
-            if (to >= 0 && to < 64 && !(friendly & (1ULL << to))) {
-                // Check if move is valid (not wrapping around board)
-                int from_file = from % 8;
-                int to_file = to % 8;
-                if (abs(from_file - to_file) <= 2) {
-                    moves.emplace_back(from, to, Piece::Type::KNIGHT);
-                }
-            }
+        // Find which of our pawns can perform the capture
+        Bitboard potential_attackers = white_to_move ? white_pawns : black_pawns;
+        Bitboard attackers = 0ULL;
+
+        // Left attacker
+        attackers |= ((ep_capture_target & Bitmasks::NOT_H_FILE) >> 1) & potential_attackers;
+        // Right attacker
+        attackers |= ((ep_capture_target & Bitmasks::NOT_A_FILE) << 1) & potential_attackers;
+
+        if (attackers) {
+            Square from = __builtin_ctzll(attackers);
+            moves.emplace_back(from, en_passant_square, Piece::Type::PAWN, Move::EN_PASSANT_FLAG);
         }
     }
 }
 
+void ChessBitboard::generateKnightMoves(std::vector<Move>& moves) const {
+    Bitboard knights = white_to_move ? white_knights : black_knights;
+    Bitboard friendly_pieces = white_to_move ? getWhitePieces() : getBlackPieces();
+
+    while (knights) {
+        Square from = __builtin_ctzll(knights);
+        Bitboard attacks = knight_attacks[from] & ~friendly_pieces;
+
+        while (attacks) {
+            Square to = __builtin_ctzll(attacks);
+            moves.emplace_back(from, to, Piece::Type::KNIGHT);
+            attacks &= attacks - 1;
+        }
+        knights &= knights - 1;
+    }
+}
+
 void ChessBitboard::generateKingMoves(std::vector<Move>& moves) const {
-    // TO-DO double check this method (ai generated)
-    static const int king_moves[8] = {-9, -8, -7, -1, 1, 7, 8, 9};
-    
     Bitboard king = white_to_move ? white_king : black_king;
-    Bitboard friendly = white_to_move ? getWhitePieces() : getBlackPieces();
+    Bitboard friendly_pieces = white_to_move ? getWhitePieces() : getBlackPieces();
     
+    // Assumes only one king per side
     Square from = __builtin_ctzll(king);
+    Bitboard attacks = king_attacks[from] & ~friendly_pieces;
+
+    while (attacks) {
+        Square to = __builtin_ctzll(attacks);
+        moves.emplace_back(from, to, Piece::Type::KING);
+        attacks &= attacks - 1;
+    }
     
-    for (int offset : king_moves) {
-        Square to = from + offset;
-        if (to >= 0 && to < 64 && !(friendly & (1ULL << to))) {
-            // Check if move is valid (not wrapping around board)
-            int from_file = from % 8;
-            int to_file = to % 8;
-            if (abs(from_file - to_file) <= 1) {
-                moves.emplace_back(from, to, Piece::Type::KING);
-            }
+    // Castling move generation
+    Bitboard occupancy = getAllPieces();
+    if (white_to_move) {
+        // White Kingside
+        if ((castling_rights & WHITE_KINGSIDE) &&
+            ((occupancy & Bitmasks::WHITE_KING_CASTLE_EMPTY) == 0) &&
+            !isSquareAttacked(4, Piece::Color::BLACK) &&
+            !isSquareAttacked(5, Piece::Color::BLACK) &&
+            !isSquareAttacked(6, Piece::Color::BLACK)) {
+            moves.emplace_back(4, 6, Piece::Type::KING, Move::CASTLE_FLAG);
+        }
+        // White Queenside
+        if ((castling_rights & WHITE_QUEENSIDE) &&
+            ((occupancy & Bitmasks::WHITE_QUEEN_CASTLE_EMPTY) == 0) &&
+            !isSquareAttacked(4, Piece::Color::BLACK) &&
+            !isSquareAttacked(3, Piece::Color::BLACK) &&
+            !isSquareAttacked(2, Piece::Color::BLACK)) {
+            moves.emplace_back(4, 2, Piece::Type::KING, Move::CASTLE_FLAG);
+        }
+    } else { // Black's turn
+        // Black Kingside
+        if ((castling_rights & BLACK_KINGSIDE) &&
+            ((occupancy & Bitmasks::BLACK_KING_CASTLE_EMPTY) == 0) &&
+            !isSquareAttacked(60, Piece::Color::WHITE) &&
+            !isSquareAttacked(61, Piece::Color::WHITE) &&
+            !isSquareAttacked(62, Piece::Color::WHITE)) {
+            moves.emplace_back(60, 62, Piece::Type::KING, Move::CASTLE_FLAG);
+        }
+        // Black Queenside
+        if ((castling_rights & BLACK_QUEENSIDE) &&
+            ((occupancy & Bitmasks::BLACK_QUEEN_CASTLE_EMPTY) == 0) &&
+            !isSquareAttacked(60, Piece::Color::WHITE) &&
+            !isSquareAttacked(59, Piece::Color::WHITE) &&
+            !isSquareAttacked(58, Piece::Color::WHITE)) {
+            moves.emplace_back(50, 58, Piece::Type::KING, Move::CASTLE_FLAG);
         }
     }
 }
