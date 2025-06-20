@@ -8,14 +8,14 @@ void ChessBitboard::initAttacks() {
         Bitboard b = 1ULL << sq;
         // Knight attacks
         Bitboard knight_atks = 0ULL;
-        knight_atks |= (b & Bitmasks::NOT_GH_FILE) << 6;
-        knight_atks |= (b & Bitmasks::NOT_G_FILE) << 15;
-        knight_atks |= (b & Bitmasks::NOT_A_FILE) << 17;
-        knight_atks |= (b & Bitmasks::NOT_AB_FILE) << 10;
-        knight_atks |= (b & Bitmasks::NOT_AB_FILE) >> 6;
-        knight_atks |= (b & Bitmasks::NOT_A_FILE) >> 15;
-        knight_atks |= (b & Bitmasks::NOT_H_FILE) >> 17;
-        knight_atks |= (b & Bitmasks::NOT_GH_FILE) >> 10;
+        knight_atks |= (b & Bitmasks::NOT_H_FILE)  << 17; // NNE (2 up, 1 right)
+        knight_atks |= (b & Bitmasks::NOT_A_FILE)  << 15; // NNW (2 up, 1 left)
+        knight_atks |= (b & Bitmasks::NOT_GH_FILE) << 10; // ENE (1 up, 2 right)
+        knight_atks |= (b & Bitmasks::NOT_AB_FILE) << 6;  // WNW (1 up, 2 left)
+        knight_atks |= (b & Bitmasks::NOT_AB_FILE) >> 10; // WSW (1 down, 2 left)
+        knight_atks |= (b & Bitmasks::NOT_GH_FILE) >> 6;  // ESE (1 down, 2 right)
+        knight_atks |= (b & Bitmasks::NOT_A_FILE)  >> 17; // SSW (2 down, 1 left)
+        knight_atks |= (b & Bitmasks::NOT_H_FILE)  >> 15; // SSE (2 down, 1 right)
         knight_attacks[sq] = knight_atks;
 
         // King attacks
@@ -211,7 +211,7 @@ void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
         // 1. Pushes (single and double)
         Square to = from + direction;
         if (to >= 0 && to < 64 && getPieceAt(to).is_empty()) {
-            if ((1ULL << to) & promotion_rank) {
+            if ((1ULL << from) & promotion_rank) {
                 // This is a promotion push
                 moves.emplace_back(from, to, Piece::Type::PAWN, Move::PROMOTION_QUEEN_FLAG);
                 moves.emplace_back(from, to, Piece::Type::PAWN, Move::PROMOTION_ROOK_FLAG);
@@ -245,7 +245,7 @@ void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
         while (attacks) {
             Square capture_to = __builtin_ctzll(attacks);
             attacks &= attacks - 1;
-            if ((1ULL << capture_to) & promotion_rank) {
+            if ((1ULL << from) & promotion_rank) {
                 // This is a promotion capture
                 moves.emplace_back(from, capture_to, Piece::Type::PAWN, Move::PROMOTION_QUEEN_FLAG);
                 moves.emplace_back(from, capture_to, Piece::Type::PAWN, Move::PROMOTION_ROOK_FLAG);
@@ -366,18 +366,88 @@ std::vector<Move> ChessBitboard::generateLegalMoves() const {
 void ChessBitboard::makeMove(const Move& move) {
     Piece moving_piece = getPieceAt(move.getFrom());
     Piece captured_piece = getPieceAt(move.getTo());
-    
-    // Move the piece
+
+    // 1. Update Halfmove Clock
+    if (moving_piece.type() == Piece::Type::PAWN || !captured_piece.is_empty()) {
+        halfmove_clock = 0;
+    } else {
+        halfmove_clock++;
+    }
+
+    // 2. Clear from square
     clearSquare(move.getFrom());
+
+    // 3. Handle special move types
+    uint8_t flags = move.getFlags();
+    if (flags == Move::CASTLE_FLAG) {
+        Square to = move.getTo();
+        // Move the correct rook
+        if (to == 6) { // White Kingside
+            setPiece(5, getPieceAt(7));
+            clearSquare(7);
+        } else if (to == 2) { // White Queenside
+            setPiece(3, getPieceAt(0));
+            clearSquare(0);
+        } else if (to == 62) { // Black Kingside
+            setPiece(61, getPieceAt(63));
+            clearSquare(63);
+        } else { // Black Queenside (to == 58)
+            setPiece(59, getPieceAt(56));
+            clearSquare(56);
+        }
+    } else if (flags == Move::EN_PASSANT_FLAG) {
+        // Remove the captured pawn, which is not on the 'to' square
+        if (white_to_move) {
+            clearSquare(move.getTo() - 8);
+        } else {
+            clearSquare(move.getTo() + 8);
+        }
+    } else if (flags >= Move::PROMOTION_KNIGHT_FLAG) {
+        // Handle promotion by placing the correct piece type
+        Piece::Type promotion_type;
+        switch(flags) {
+            case Move::PROMOTION_QUEEN_FLAG: promotion_type = Piece::Type::QUEEN; break;
+            case Move::PROMOTION_ROOK_FLAG:  promotion_type = Piece::Type::ROOK;  break;
+            case Move::PROMOTION_BISHOP_FLAG:promotion_type = Piece::Type::BISHOP;break;
+            default:                        promotion_type = Piece::Type::KNIGHT;break; // PROMOTION_KNIGHT_FLAG
+        }
+        moving_piece = Piece(moving_piece.color(), promotion_type);
+    }
+    
+    // 4. Set the piece on the destination square
     setPiece(move.getTo(), moving_piece);
+
+    // 5. Update Castling Rights
+    // Remove rights if king or rooks move from their starting squares
+    if (moving_piece.type() == Piece::Type::KING) {
+        if (moving_piece.color() == Piece::Color::WHITE) {
+            castling_rights &= ~WHITE_KINGSIDE;
+            castling_rights &= ~WHITE_QUEENSIDE;
+        } else {
+            castling_rights &= ~BLACK_KINGSIDE;
+            castling_rights &= ~BLACK_QUEENSIDE;
+        }
+    }
+    if (move.getFrom() == 0) castling_rights &= ~WHITE_QUEENSIDE; // a1
+    if (move.getFrom() == 7) castling_rights &= ~WHITE_KINGSIDE;  // h1
+    if (move.getFrom() == 56) castling_rights &= ~BLACK_QUEENSIDE; // a8
+    if (move.getFrom() == 63) castling_rights &= ~BLACK_KINGSIDE;  // h8
     
-    // Update game state
+    // 6. Update En Passant Square
+    en_passant_square = -1;
+    if (moving_piece.type() == Piece::Type::PAWN) {
+        if ((move.getTo() - move.getFrom()) == 16) { // White double push
+            en_passant_square = move.getFrom() + 8;
+        } else if ((move.getTo() - move.getFrom()) == -16) { // Black double push
+            en_passant_square = move.getFrom() - 8;
+        }
+    }
+    
+    // 7. Update turn and move counters
     white_to_move = !white_to_move;
-    
-    // TODO: Handle castling, en passant, promotion
-    // TODO: Update castling rights based on move
-    // TODO: Update halfmove clock
-    if (white_to_move) fullmove_number++;
+    if (white_to_move) {
+        fullmove_number++;
+    }
 }
 
 bool ChessBitboard::isLegal(const Move& move) const {

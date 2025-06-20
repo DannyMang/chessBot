@@ -27,6 +27,7 @@ constexpr uint64_t RANK_8 = 0xFF00000000000000ULL;
 constexpr uint64_t NOT_A_FILE  = 0xFEFEFEFEFEFEFEFEULL;
 constexpr uint64_t NOT_H_FILE  = 0x7F7F7F7F7F7F7F7FULL;
 constexpr uint64_t NOT_AB_FILE = 0xFCFCFCFCFCFCFCFCULL;
+constexpr uint64_t NOT_G_FILE  = 0xBFBFBFBFBFBFBFBFULL;
 constexpr uint64_t NOT_GH_FILE = 0x3F3F3F3F3F3F3F3FULL;
 
 // Castling Masks

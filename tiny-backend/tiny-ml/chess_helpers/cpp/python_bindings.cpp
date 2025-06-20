@@ -34,10 +34,11 @@ PYBIND11_MODULE(chess_engine, m) {
 
     py::class_<Move>(m, "Move")
         .def(py::init<>())
-        .def(py::init<Square, Square, Piece::Type>(), py::arg("from"), py::arg("to"), py::arg("piece_type"))
+        .def(py::init<Square, Square, Piece::Type, uint8_t>(), py::arg("from"), py::arg("to"), py::arg("piece_type"), py::arg("flags") = 0)
         .def("get_from", &Move::getFrom)
         .def("get_to", &Move::getTo)
-        .def("get_piece_type", &Move::getPieceType);
+        .def("get_piece_type", &Move::getPieceType)
+        .def("get_flags", &Move::getFlags);
     
     // Auto-convert camelCase to snake_case
     py::class_<ChessBitboard>(m, "ChessBitboard", py::dynamic_attr())
@@ -56,6 +57,7 @@ PYBIND11_MODULE(chess_engine, m) {
         // Expose public members
         .def_readwrite("white_to_move", &ChessBitboard::white_to_move)
         .def_readwrite("fullmove_number", &ChessBitboard::fullmove_number)
+        .def_readonly("en_passant_square", &ChessBitboard::en_passant_square)
         .def_readonly("white_pawns", &ChessBitboard::white_pawns)
         .def_readonly("white_knights", &ChessBitboard::white_knights)
         .def_readonly("white_bishops", &ChessBitboard::white_bishops)

@@ -103,29 +103,94 @@ def test_is_in_check(board):
     assert board.is_in_check(chess_engine.Color.WHITE)
     assert not board.is_in_check(chess_engine.Color.BLACK)
 
-@pytest.mark.xfail(reason="Perft not fully implemented yet")
 def test_perft_1(board):
     """Performance test at depth 1. Should be 20."""
     board.set_starting_position()
     assert board.perft(1) == 20
 
-@pytest.mark.xfail(reason="Perft not fully implemented yet")
 def test_perft_2(board):
     """Performance test at depth 2. Should be 400."""
     board.set_starting_position()
     assert board.perft(2) == 400
 
-@pytest.mark.xfail(reason="Castling not implemented")
-def test_castling():
-    """Test castling. Not implemented yet."""
-    assert False, "Test for castling not implemented."
-    
-@pytest.mark.xfail(reason="En passant not implemented")
-def test_en_passant():
-    """Test en passant. Not implemented yet."""
-    assert False, "Test for en passant not implemented."
+def test_castling(board):
+    """Test legal castling moves."""
+    # Setup for white kingside castling
+    board.set_starting_position()
+    board.clear_square(1)  # Clear knight on b1
+    board.clear_square(2)  # Clear bishop on c1
+    board.clear_square(3)  # Clear queen on d1
+    board.clear_square(5)  # Clear bishop on f1
+    board.clear_square(6)  # Clear knight on g1
 
-@pytest.mark.xfail(reason="Promotion not implemented")
-def test_promotion():
-    """Test pawn promotion. Not implemented yet."""
-    assert False, "Test for pawn promotion not implemented." 
+    moves = board.generate_legal_moves()
+    # Kingside castling move is from e1 (4) to g1 (6)
+    castle_move = next((m for m in moves if m.get_from() == 4 and m.get_to() == 6), None)
+    assert castle_move is not None, "Kingside castling move not found"
+    
+    board.make_move(castle_move)
+    assert board.get_piece_at(6).type() == chess_engine.PieceType.KING
+    assert board.get_piece_at(5).type() == chess_engine.PieceType.ROOK
+    assert board.get_piece_at(4).is_empty()
+    assert board.get_piece_at(7).is_empty()
+
+def test_en_passant(board):
+    """Test a valid en passant capture."""
+    # Set up pieces for the test
+    board.set_piece(4, chess_engine.Piece(chess_engine.Color.WHITE, chess_engine.PieceType.KING))
+    board.set_piece(60, chess_engine.Piece(chess_engine.Color.BLACK, chess_engine.PieceType.KING))
+    board.set_piece(36, chess_engine.Piece(chess_engine.Color.WHITE, chess_engine.PieceType.PAWN)) # White pawn on e5
+    board.set_piece(51, chess_engine.Piece(chess_engine.Color.BLACK, chess_engine.PieceType.PAWN)) # Black pawn on d7
+    
+    board.white_to_move = False # Black's turn
+    
+    # Black pushes pawn d7-d5, creating an en passant opportunity
+    d5_move = next(m for m in board.generate_legal_moves() if m.get_from() == 51 and m.get_to() == 35)
+    board.make_move(d5_move)
+    
+    # Now it's white's turn. The en passant square should be d6 (43)
+    assert board.en_passant_square == 43
+    
+    # Check if the en passant capture e5xd6 is available
+    moves = board.generate_legal_moves()
+    ep_move = next((m for m in moves if m.get_from() == 36 and m.get_to() == 43), None)
+    
+    assert ep_move is not None, "En passant move not found"
+    assert ep_move.get_flags() == 1 # EN_PASSANT_FLAG is 1 in C++
+    
+    # Make the en passant move
+    board.make_move(ep_move)
+    
+    # Verify the board state
+    assert board.get_piece_at(43).type() == chess_engine.PieceType.PAWN # White pawn on d6
+    assert board.get_piece_at(43).color() == chess_engine.Color.WHITE
+    assert board.get_piece_at(35).is_empty() # Black pawn on d5 is captured
+    assert board.get_piece_at(36).is_empty() # White pawn moved from e5
+
+def test_promotion(board):
+    """Test that pawn promotion generates correct moves and updates the board."""
+    # Set up a pawn about to promote
+    board.set_piece(4, chess_engine.Piece(chess_engine.Color.WHITE, chess_engine.PieceType.KING))
+    board.set_piece(60, chess_engine.Piece(chess_engine.Color.BLACK, chess_engine.PieceType.KING))
+    board.set_piece(55, chess_engine.Piece(chess_engine.Color.WHITE, chess_engine.PieceType.PAWN)) # White pawn on h7
+    
+    board.white_to_move = True
+    
+    # Generate moves, expecting 4 promotion moves
+    moves = board.generate_legal_moves()
+    promotion_moves = [m for m in moves if m.get_from() == 55 and m.get_to() == 63]
+    assert len(promotion_moves) == 4, "Should be 4 promotion moves"
+    
+    # Find the queen promotion
+    # PROMOTION_QUEEN_FLAG = 11 in C++
+    queen_promo = next((m for m in promotion_moves if m.get_flags() == 11), None)
+    assert queen_promo is not None, "Queen promotion move not found"
+    
+    # Make the move
+    board.make_move(queen_promo)
+    
+    # Verify the promotion
+    promoted_piece = board.get_piece_at(63)
+    assert promoted_piece.type() == chess_engine.PieceType.QUEEN
+    assert promoted_piece.color() == chess_engine.Color.WHITE
+    assert board.get_piece_at(55).is_empty()
