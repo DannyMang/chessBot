@@ -47,4 +47,16 @@
 /chess-frontend/.env.local
 /chess-frontend/.env.development.local
 /chess-frontend/.env.test.local
-/chess-frontend/.env.production.local 
+/chess-frontend/.env.production.local
+
+# Python specific ignores
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/ 
