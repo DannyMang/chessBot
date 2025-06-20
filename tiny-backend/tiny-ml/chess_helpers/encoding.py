@@ -5,6 +5,7 @@
 import numpy as np
 import chess
 
+#convert FEN to bitboard
 class ChessStateEncoder:
     def __init__(self):
         pass
