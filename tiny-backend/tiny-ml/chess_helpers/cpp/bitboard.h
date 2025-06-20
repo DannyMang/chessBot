@@ -66,6 +66,9 @@ public:
     // Performance testing
     uint64_t perft(int depth) const;
 
+    // FEN parsing
+    void loadFen(const std::string& fen);
+
 private:
     void initAttacks();
     void updateMailbox();
