@@ -1,6 +1,36 @@
 #include "bitboard.h"
 #include <algorithm>
 #include "magicmoves.h"
+#include "bitmasks.h"
+
+void ChessBitboard::initAttacks() {
+    for (int sq = 0; sq < 64; sq++) {
+        Bitboard b = 1ULL << sq;
+        // Knight attacks
+        Bitboard knight_atks = 0ULL;
+        knight_atks |= (b & Bitmasks::NOT_GH_FILE) << 6;
+        knight_atks |= (b & Bitmasks::NOT_G_FILE) << 15;
+        knight_atks |= (b & Bitmasks::NOT_A_FILE) << 17;
+        knight_atks |= (b & Bitmasks::NOT_AB_FILE) << 10;
+        knight_atks |= (b & Bitmasks::NOT_AB_FILE) >> 6;
+        knight_atks |= (b & Bitmasks::NOT_A_FILE) >> 15;
+        knight_atks |= (b & Bitmasks::NOT_H_FILE) >> 17;
+        knight_atks |= (b & Bitmasks::NOT_GH_FILE) >> 10;
+        knight_attacks[sq] = knight_atks;
+
+        // King attacks
+        Bitboard king_atks = 0ULL;
+        king_atks |= (b & Bitmasks::NOT_A_FILE) << 7;
+        king_atks |= (b) << 8;
+        king_atks |= (b & Bitmasks::NOT_H_FILE) << 9;
+        king_atks |= (b & Bitmasks::NOT_H_FILE) << 1;
+        king_atks |= (b & Bitmasks::NOT_H_FILE) >> 7;
+        king_atks |= (b) >> 8;
+        king_atks |= (b & Bitmasks::NOT_A_FILE) >> 9;
+        king_atks |= (b & Bitmasks::NOT_A_FILE) >> 1;
+        king_attacks[sq] = king_atks;
+    }
+}
 
 ChessBitboard::ChessBitboard() {
     // Initialize all bitboards to 0
@@ -21,6 +51,9 @@ ChessBitboard::ChessBitboard() {
         mailbox[i] = Piece();
     }
     
+    // Initialize attack tables
+    initAttacks();
+
     // Initialize magic bitboards
     initmagicmoves();
 }
@@ -163,27 +196,64 @@ std::vector<Move> ChessBitboard::generatePseudoLegalMoves() const {
     
     return moves;
 }
+
 void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
     Bitboard pawns = white_to_move ? white_pawns : black_pawns;
+    Bitboard enemy_pieces = white_to_move ? getBlackPieces() : getWhitePieces();
+    
     int direction = white_to_move ? 8 : -8;
-    int start_rank_mask = white_to_move ? 1 : 6;
+    Bitboard promotion_rank = white_to_move ? Bitmasks::RANK_7 : Bitmasks::RANK_2;
 
     while (pawns) {
         Square from = __builtin_ctzll(pawns);
         pawns &= pawns - 1;
-        
-        // Single push
+
+        // 1. Pushes (single and double)
         Square to = from + direction;
         if (to >= 0 && to < 64 && getPieceAt(to).is_empty()) {
-            moves.emplace_back(from, to, Piece::Type::PAWN);
+            if ((1ULL << to) & promotion_rank) {
+                // This is a promotion push
+                moves.emplace_back(from, to, Piece::Type::PAWN, Move::PROMOTION_QUEEN_FLAG);
+                moves.emplace_back(from, to, Piece::Type::PAWN, Move::PROMOTION_ROOK_FLAG);
+                moves.emplace_back(from, to, Piece::Type::PAWN, Move::PROMOTION_BISHOP_FLAG);
+                moves.emplace_back(from, to, Piece::Type::PAWN, Move::PROMOTION_KNIGHT_FLAG);
+            } else {
+                // Regular single push
+                moves.emplace_back(from, to, Piece::Type::PAWN);
+            }
 
             // Double push from starting rank
-            bool is_on_start_rank = (from / 8 == start_rank_mask);
+            bool is_on_start_rank = (1ULL << from) & (white_to_move ? Bitmasks::RANK_2 : Bitmasks::RANK_7);
             if (is_on_start_rank) {
                 Square double_to = from + 2 * direction;
                 if (double_to >= 0 && double_to < 64 && getPieceAt(double_to).is_empty()) {
                     moves.emplace_back(from, double_to, Piece::Type::PAWN);
                 }
+            }
+        }
+        
+        // 2. Captures
+        Bitboard from_bb = 1ULL << from;
+        Bitboard attacks = 0ULL;
+        if (white_to_move) {
+            attacks = (((from_bb & Bitmasks::NOT_A_FILE) << 7) | ((from_bb & Bitmasks::NOT_H_FILE) << 9));
+        } else {
+            attacks = (((from_bb & Bitmasks::NOT_H_FILE) >> 7) | ((from_bb & Bitmasks::NOT_A_FILE) >> 9));
+        }
+        attacks &= enemy_pieces;
+
+        while (attacks) {
+            Square capture_to = __builtin_ctzll(attacks);
+            attacks &= attacks - 1;
+            if ((1ULL << capture_to) & promotion_rank) {
+                // This is a promotion capture
+                moves.emplace_back(from, capture_to, Piece::Type::PAWN, Move::PROMOTION_QUEEN_FLAG);
+                moves.emplace_back(from, capture_to, Piece::Type::PAWN, Move::PROMOTION_ROOK_FLAG);
+                moves.emplace_back(from, capture_to, Piece::Type::PAWN, Move::PROMOTION_BISHOP_FLAG);
+                moves.emplace_back(from, capture_to, Piece::Type::PAWN, Move::PROMOTION_KNIGHT_FLAG);
+            } else {
+                // Regular capture
+                moves.emplace_back(from, capture_to, Piece::Type::PAWN);
             }
         }
     }
@@ -284,8 +354,8 @@ bool ChessBitboard::isInCheck(Piece::Color color) const {
     
     return isSquareAttacked(king_square, enemy_color);
 }
+
 bool ChessBitboard::isSquareAttacked(Square square, Piece::Color by_color) const {
-    // Simple attack detection - implement properly later
     Bitboard occupancy = getAllPieces();
     
     // Check for rook/queen attacks
@@ -300,7 +370,28 @@ bool ChessBitboard::isSquareAttacked(Square square, Piece::Color by_color) const
         (white_bishops | white_queens) : (black_bishops | black_queens);
     if (bishop_attacks & enemy_bishops_queens) return true;
     
-    // TODO: Check for pawn, knight, king attacks
+    // Check for pawn attacks
+    Bitboard enemy_pawns = (by_color == Piece::Color::WHITE) ? white_pawns : black_pawns;
+    Bitboard square_bb = 1ULL << square;
+    if (by_color == Piece::Color::WHITE) {
+        // White pawns attack from NW and NE relative to the piece at 'square'
+        if ((((square_bb & Bitmasks::NOT_A_FILE) >> 9) & enemy_pawns) || (((square_bb & Bitmasks::NOT_H_FILE) >> 7) & enemy_pawns)) {
+            return true;
+        }
+    } else { // Black attacks
+        if ((((square_bb & Bitmasks::NOT_H_FILE) << 9) & enemy_pawns) || (((square_bb & Bitmasks::NOT_A_FILE) << 7) & enemy_pawns)) {
+            return true;
+        }
+    }
+
+    // Check for knight attacks
+    Bitboard enemy_knights = (by_color == Piece::Color::WHITE) ? white_knights : black_knights;
+    if (knight_attacks[square] & enemy_knights) return true;
+
+    // Check for king attacks
+    Bitboard enemy_king = (by_color == Piece::Color::WHITE) ? white_king : black_king;
+    if (king_attacks[square] & enemy_king) return true;
+
     return false;
 }
 

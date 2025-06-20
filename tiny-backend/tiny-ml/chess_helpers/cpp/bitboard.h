@@ -32,6 +32,10 @@ public:
     // Mailbox for fast piece lookup
     Piece mailbox[64];
     
+    // Pre-computed attack tables
+    Bitboard knight_attacks[64];
+    Bitboard king_attacks[64];
+    
     ChessBitboard();
     
     // Basic operations
@@ -63,6 +67,7 @@ public:
     uint64_t perft(int depth) const;
 
 private:
+    void initAttacks();
     void updateMailbox();
     void removePieceFromBitboard(Square square, Piece piece);
     void addPieceToBitboard(Square square, Piece piece);
