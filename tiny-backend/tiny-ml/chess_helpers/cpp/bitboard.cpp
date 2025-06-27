@@ -1,5 +1,7 @@
 #include "bitboard.h"
 #include <algorithm>
+#include <sstream>
+#include <vector>
 #include "magicmoves.h"
 #include "bitmasks.h"
 
@@ -56,6 +58,77 @@ ChessBitboard::ChessBitboard() {
 
     // Initialize magic bitboards
     initmagicmoves();
+}
+
+void ChessBitboard::loadFen(const std::string& fen) {
+    // Clear the board first
+    white_pawns = white_knights = white_bishops = white_rooks = white_queens = white_king = 0;
+    black_pawns = black_knights = black_bishops = black_rooks = black_queens = black_king = 0;
+    for (int i = 0; i < 64; ++i) {
+        mailbox[i] = Piece();
+    }
+    castling_rights = 0;
+    en_passant_square = -1;
+    halfmove_clock = 0;
+    fullmove_number = 1;
+
+    std::stringstream ss(fen);
+    std::string piece_placement, active_color, castling, en_passant, halfmove, fullmove;
+    
+    ss >> piece_placement >> active_color >> castling >> en_passant >> halfmove >> fullmove;
+
+    // 1. Piece placement
+    int rank = 7, file = 0;
+    for (char c : piece_placement) {
+        if (c == '/') {
+            rank--;
+            file = 0;
+        } else if (isdigit(c)) {
+            file += c - '0';
+        } else {
+            Square sq = rank * 8 + file;
+            Piece p;
+            Piece::Color color = isupper(c) ? Piece::Color::WHITE : Piece::Color::BLACK;
+            switch (tolower(c)) {
+                case 'p': p = Piece(color, Piece::Type::PAWN); break;
+                case 'n': p = Piece(color, Piece::Type::KNIGHT); break;
+                case 'b': p = Piece(color, Piece::Type::BISHOP); break;
+                case 'r': p = Piece(color, Piece::Type::ROOK); break;
+                case 'q': p = Piece(color, Piece::Type::QUEEN); break;
+                case 'k': p = Piece(color, Piece::Type::KING); break;
+            }
+            setPiece(sq, p);
+            file++;
+        }
+    }
+
+    // 2. Active color
+    white_to_move = (active_color == "w");
+
+    // 3. Castling availability
+    for (char c : castling) {
+        switch (c) {
+            case 'K': castling_rights |= 0b0001; break;
+            case 'Q': castling_rights |= 0b0010; break;
+            case 'k': castling_rights |= 0b0100; break;
+            case 'q': castling_rights |= 0b1000; break;
+        }
+    }
+
+    // 4. En passant target square
+    if (en_passant != "-") {
+        int ep_file = en_passant[0] - 'a';
+        int ep_rank = en_passant[1] - '1';
+        en_passant_square = ep_rank * 8 + ep_file;
+    }
+
+    // 5. Halfmove clock
+    halfmove_clock = std::stoi(halfmove);
+
+    // 6. Fullmove number
+    fullmove_number = std::stoi(fullmove);
+    
+    updateMailbox();
 }
 
 Bitboard ChessBitboard::getWhitePieces() const {

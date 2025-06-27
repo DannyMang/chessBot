@@ -44,6 +44,7 @@ PYBIND11_MODULE(chess_engine, m) {
     py::class_<ChessBitboard>(m, "ChessBitboard", py::dynamic_attr())
         .def(py::init<>())
         .def("set_starting_position", &ChessBitboard::setStartingPosition)
+        .def("load_fen", &ChessBitboard::loadFen, "Load a position from a FEN string")
         .def("get_piece_at", &ChessBitboard::getPieceAt)
         .def("generate_legal_moves", &ChessBitboard::generateLegalMoves)
         .def("make_move", &ChessBitboard::makeMove)
