@@ -55,6 +55,7 @@ PYBIND11_MODULE(chess_engine, m) {
         .def("clear_square", &ChessBitboard::clearSquare)
         .def("is_in_check", &ChessBitboard::isInCheck)
         .def("perft", &ChessBitboard::perft)
+        .def("perft_divide", &ChessBitboard::perft_divide)
         // Expose public members
         .def_readwrite("white_to_move", &ChessBitboard::white_to_move)
         .def_readwrite("fullmove_number", &ChessBitboard::fullmove_number)

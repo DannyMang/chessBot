@@ -2,8 +2,27 @@
 #include <algorithm>
 #include <sstream>
 #include <vector>
+#include <map>
 #include "magicmoves.h"
 #include "bitmasks.h"
+
+// Helper to convert move to string format for map keys
+std::string move_to_string(const Move& move) {
+    std::string str;
+    str += (char)('a' + (move.getFrom() % 8));
+    str += (char)('1' + (move.getFrom() / 8));
+    str += (char)('a' + (move.getTo() % 8));
+    str += (char)('1' + (move.getTo() / 8));
+    if (move.getFlags() >= Move::PROMOTION_KNIGHT_FLAG) {
+        switch(move.getFlags()) {
+            case Move::PROMOTION_QUEEN_FLAG: str += 'q'; break;
+            case Move::PROMOTION_ROOK_FLAG:  str += 'r'; break;
+            case Move::PROMOTION_BISHOP_FLAG:str += 'b'; break;
+            case Move::PROMOTION_KNIGHT_FLAG:str += 'n'; break;
+        }
+    }
+    return str;
+}
 
 void ChessBitboard::initAttacks() {
     for (int sq = 0; sq < 64; sq++) {
@@ -333,20 +352,27 @@ void ChessBitboard::generatePawnMoves(std::vector<Move>& moves) const {
     
     // 3. En Passant
     if (en_passant_square != -1) {
-        // Get the square of the pawn that could be captured
-        Bitboard ep_capture_target = 1ULL << (white_to_move ? en_passant_square - 8 : en_passant_square + 8);
-
-        // Find which of our pawns can perform the capture
+        Bitboard ep_bb = 1ULL << en_passant_square;
         Bitboard potential_attackers = white_to_move ? white_pawns : black_pawns;
         Bitboard attackers = 0ULL;
+        
+        if (white_to_move) { // Black just double-pushed, we are white, ep_sq is on rank 6
+            // Attacker from our left (e.g. c5 attacking d6) is at ep_sq - 9
+            attackers |= (ep_bb >> 9) & Bitmasks::NOT_H_FILE;
+            // Attacker from our right (e.g. e5 attacking d6) is at ep_sq - 7
+            attackers |= (ep_bb >> 7) & Bitmasks::NOT_A_FILE;
+        } else { // White just double-pushed, we are black, ep_sq is on rank 3
+            // Attacker from our left (e.g. c4 attacking d3) is at ep_sq + 7
+            attackers |= (ep_bb << 7) & Bitmasks::NOT_H_FILE;
+            // Attacker from our right (e.g. e4 attacking d3) is at ep_sq + 9
+            attackers |= (ep_bb << 9) & Bitmasks::NOT_A_FILE;
+        }
+        
+        attackers &= potential_attackers;
 
-        // Left attacker
-        attackers |= ((ep_capture_target & Bitmasks::NOT_H_FILE) >> 1) & potential_attackers;
-        // Right attacker
-        attackers |= ((ep_capture_target & Bitmasks::NOT_A_FILE) << 1) & potential_attackers;
-
-        if (attackers) {
+        while (attackers) {
             Square from = __builtin_ctzll(attackers);
+            attackers &= attackers - 1;
             moves.emplace_back(from, en_passant_square, Piece::Type::PAWN, Move::EN_PASSANT_FLAG);
         }
     }
@@ -417,7 +443,7 @@ void ChessBitboard::generateKingMoves(std::vector<Move>& moves) const {
             !isSquareAttacked(60, Piece::Color::WHITE) &&
             !isSquareAttacked(59, Piece::Color::WHITE) &&
             !isSquareAttacked(58, Piece::Color::WHITE)) {
-            moves.emplace_back(50, 58, Piece::Type::KING, Move::CASTLE_FLAG);
+            moves.emplace_back(60, 58, Piece::Type::KING, Move::CASTLE_FLAG);
         }
     }
 }
@@ -505,6 +531,12 @@ void ChessBitboard::makeMove(const Move& move) {
     if (move.getFrom() == 7) castling_rights &= ~WHITE_KINGSIDE;  // h1
     if (move.getFrom() == 56) castling_rights &= ~BLACK_QUEENSIDE; // a8
     if (move.getFrom() == 63) castling_rights &= ~BLACK_KINGSIDE;  // h8
+    
+    // Also remove rights if a rook is captured on its home square
+    if (move.getTo() == 0) castling_rights &= ~WHITE_QUEENSIDE;
+    if (move.getTo() == 7) castling_rights &= ~WHITE_KINGSIDE;
+    if (move.getTo() == 56) castling_rights &= ~BLACK_QUEENSIDE;
+    if (move.getTo() == 63) castling_rights &= ~BLACK_KINGSIDE;
     
     // 6. Update En Passant Square
     en_passant_square = -1;
@@ -596,7 +628,18 @@ uint64_t ChessBitboard::perft(int depth) const {
     return nodes;
 }
 
+std::map<std::string, uint64_t> ChessBitboard::perft_divide(int depth) {
+    std::map<std::string, uint64_t> results;
+    if (depth == 0) return results;
 
+    auto moves = generateLegalMoves();
+    for (const Move& move : moves) {
+        ChessBitboard temp = *this;
+        temp.makeMove(move);
+        results[move_to_string(move)] = temp.perft(depth - 1);
+    }
+    return results;
+}
 
 // Helper methods
 void ChessBitboard::updateMailbox() {

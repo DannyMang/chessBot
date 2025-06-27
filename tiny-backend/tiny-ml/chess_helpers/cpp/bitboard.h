@@ -4,6 +4,8 @@
 #include "move.h"
 #include "magicmoves_wrapper.h"
 #include <vector>
+#include <string>
+#include <map>
 
 class ChessBitboard {
 public:
@@ -65,6 +67,7 @@ public:
 
     // Performance testing
     uint64_t perft(int depth) const;
+    std::map<std::string, uint64_t> perft_divide(int depth);
 
     // FEN parsing
     void loadFen(const std::string& fen);
