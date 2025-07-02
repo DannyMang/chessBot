@@ -1,19 +1,23 @@
 from dataclasses import dataclass, field
 import math
-from typing import Any
-
+import copy
+import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
+from chess_helpers.cpp import chess_engine
+from model import ChessNet
 
 @dataclass
-class State:
+class MCTSNode:
     """
-    Represents a state in the MCTS tree.
+    Represents a node in the MCTS tree for AlphaZero.
     """
     board: Any  # This would be your board state
     visit_count: int = 0
     value: float = 0.0
     reward: float = 0.0
-    parent: 'State' = None
+    parent: 'MCTSNode' = None
     children: list = field(default_factory=list)
+    prior: float = 0.0
 
     def is_leaf_node(self):
         """
@@ -36,14 +40,20 @@ def mcts(model, board, start_state, exploration_constant=1.41):
         for move in get_legal_moves(current.board):
             new_board = copy.deepcopy(current.board)
             new_board.make_move(move)
-            child = State(board=new_board, parent=current)
+            child = MCTSNode(board=new_board, parent=current)
+            board_tensor = current.board.to_tensor() 
+            policy, _ = model.predict(board_tensor)
+            child.prior = policy[move]
             current.children.append(child)
         
         if current.children:
             current = current.children[0] 
     
     # 3. Rollout 
-    rollout_result = rollout(model, copy.deepcopy(current.board))
+    board_tensor = current.board.to_tensor()  
+    _, value = model.predict(board_tensor)
+    rollout_result = value
+        
     
     # 4. Backpropagation
     while current is not None:
@@ -72,12 +82,17 @@ def rollout(model, board):
         move = model.get_move(board)
         board.make_move(move)
 
-def is_game_over(state):
+def is_game_over(board):
     """
     Check if the game state is terminal
     """
-    return False
+    return board.is_game_over()
 
 
 def ucb(state, exploration_constant):
-    return state.reward + exploration_constant * math.sqrt(math.log(state.parent.visit_count) / state.visit_count)
+    if state.visit_count == 0:
+        return float('inf')
+    q_value = state.value / state.visit_count
+    exploration = exploration_constant * state.prior * math.sqrt(state.parent.visit_count) / (1 + state.visit_count)
+    return q_value + exploration
+    
