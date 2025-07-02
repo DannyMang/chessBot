@@ -5,6 +5,7 @@ import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 from chess_helpers.cpp import chess_engine
 from model import ChessNet
+from chess_helpers.game_logic import is_game_over, get_game_result, board_to_tensor, move_to_policy_index
 
 @dataclass
 class MCTSNode:
@@ -41,16 +42,17 @@ def mcts(model, board, start_state, exploration_constant=1.41):
             new_board = copy.deepcopy(current.board)
             new_board.make_move(move)
             child = MCTSNode(board=new_board, parent=current)
-            board_tensor = current.board.to_tensor() 
+            board_tensor = board_to_tensor(current.board)
             policy, _ = model.predict(board_tensor)
-            child.prior = policy[move]
+            move_idx = move_to_policy_index(move)
+            child.prior = policy[0, move_idx].item() 
             current.children.append(child)
         
         if current.children:
             current = current.children[0] 
     
     # 3. Rollout 
-    board_tensor = current.board.to_tensor()  
+    board_tensor = board_to_tensor(current.board)  
     _, value = model.predict(board_tensor)
     rollout_result = value
         
@@ -82,11 +84,6 @@ def rollout(model, board):
         move = model.get_move(board)
         board.make_move(move)
 
-def is_game_over(board):
-    """
-    Check if the game state is terminal
-    """
-    return board.is_game_over()
 
 
 def ucb(state, exploration_constant):

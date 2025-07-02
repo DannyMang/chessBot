@@ -458,30 +458,6 @@ std::vector<Move> ChessBitboard::generateLegalMoves() const {
             legal_moves.push_back(move);
         }
     }
-
-    if (legal_moves.empty()) {
-        // check for checkmate
-        if (isInCheck(white_to_move ? Piece::Color::WHITE : Piece::Color::BLACK)) {
-            return {Move(0, 0, Piece::Type::NONE)};
-        }
-        // check for stalemate
-        if (pseudo_legal.empty()) {
-            return {Move(0, 0, Piece::Type::NONE)};
-        }
-        // draw by 50 move rule
-        if (halfmove_clock >= 100) {
-            return {Move(0, 0, Piece::Type::NONE)};
-        }
-        // draw by repetition
-        if (halfmove_clock >= 100) {
-            return {Move(0, 0, Piece::Type::NONE)};
-        }
-        // draw by insufficient material
-        if (getWhitePieces() == 0 && getBlackPieces() == 0) {
-            return {Move(0, 0, Piece::Type::NONE)};
-        }
-        // draw by 50 move rule
-    }
     
     return legal_moves;
 }
@@ -742,4 +718,98 @@ void ChessBitboard::removePieceFromBitboard(Square square, Piece piece) {
             case Piece::Type::NONE: break;
         }
     }
+}
+
+bool ChessBitboard::hasInsufficientMaterial() const {
+    // Count pieces using __builtin_popcountll
+    int white_pawns_count = __builtin_popcountll(white_pawns);
+    int white_knights_count = __builtin_popcountll(white_knights);
+    int white_bishops_count = __builtin_popcountll(white_bishops);
+    int white_rooks_count = __builtin_popcountll(white_rooks);
+    int white_queens_count = __builtin_popcountll(white_queens);
+    
+    int black_pawns_count = __builtin_popcountll(black_pawns);
+    int black_knights_count = __builtin_popcountll(black_knights);
+    int black_bishops_count = __builtin_popcountll(black_bishops);
+    int black_rooks_count = __builtin_popcountll(black_rooks);
+    int black_queens_count = __builtin_popcountll(black_queens);
+    
+    int white_total = white_pawns_count + white_knights_count + white_bishops_count + white_rooks_count + white_queens_count;
+    int black_total = black_pawns_count + black_knights_count + black_bishops_count + black_rooks_count + black_queens_count;
+    
+    // King vs King
+    if (white_total == 0 && black_total == 0) return true;
+    
+    // King and Bishop vs King
+    if ((white_bishops_count == 1 && white_total == 1 && black_total == 0) ||
+        (black_bishops_count == 1 && black_total == 1 && white_total == 0)) {
+        return true;
+    }
+    
+    // King and Knight vs King  
+    if ((white_knights_count == 1 && white_total == 1 && black_total == 0) ||
+        (black_knights_count == 1 && black_total == 1 && white_total == 0)) {
+        return true;
+    }
+    
+    // King and Bishop vs King and Bishop (same color squares)
+    if (white_bishops_count == 1 && white_total == 1 && 
+        black_bishops_count == 1 && black_total == 1) {
+        
+        // Find bishop squares
+        Square white_bishop_sq = __builtin_ctzll(white_bishops);
+        Square black_bishop_sq = __builtin_ctzll(black_bishops);
+        
+        // Check if same colored squares (same parity)
+        bool white_light = ((white_bishop_sq / 8) + (white_bishop_sq % 8)) % 2 == 0;
+        bool black_light = ((black_bishop_sq / 8) + (black_bishop_sq % 8)) % 2 == 0;
+        
+        if (white_light == black_light) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool ChessBitboard::isGameOver() const {
+    std::vector<Move> legal_moves = generateLegalMoves();
+    
+    // No legal moves = checkmate or stalemate
+    if (legal_moves.empty()) {
+        return true;
+    }
+    
+    // 50-move rule
+    if (halfmove_clock >= 100) {
+        return true;
+    }
+    
+    // Insufficient material
+    if (hasInsufficientMaterial()) {
+        return true;
+    }
+    
+    // TODO: Add threefold repetition check
+    return false;
+}
+
+int ChessBitboard::getResult() const {
+    std::vector<Move> legal_moves = generateLegalMoves();
+    
+    if (legal_moves.empty()) {
+        Piece::Color current_color = white_to_move ? Piece::Color::WHITE : Piece::Color::BLACK;
+        if (isInCheck(current_color)) {
+            return white_to_move ? -1 : 1;  // Current player loses
+        } else {
+            return 0;  // Stalemate = draw
+        }
+    }
+    
+    if (halfmove_clock >= 100 || hasInsufficientMaterial()) {
+        return 0;  // Draw
+    }
+    
+    // Game continues
+    return 999;  // Special value meaning game not over
 }

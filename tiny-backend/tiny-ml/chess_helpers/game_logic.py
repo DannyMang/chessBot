@@ -3,41 +3,13 @@ from tinygrad.tensor import Tensor
 import numpy as np
 
 def is_game_over(board):
-    """Check if game is over"""
-    legal_moves = board.generate_legal_moves()
-    
-    # No legal moves = checkmate or stalemate
-    if len(legal_moves) == 0:
-        return True
-    
-    # 50-move rule
-    if board.halfmove_clock >= 100:
-        return True
-    
-    if board.has_insufficient_material(): # NOT DONE 
-        return True
-    
-    # TODO: Add other draw conditions
-    return False
+    """Check if game is over (delegates to C++ method)"""
+    return board.is_game_over()
 
 def get_game_result(board):
-    """Get result from current player's perspective: 1=win, -1=loss, 0=draw"""
-    legal_moves = board.generate_legal_moves()
-    
-    if len(legal_moves) == 0:
-        current_color = chess_engine.Color.WHITE if board.white_to_move else chess_engine.Color.BLACK
-        if board.is_in_check(current_color):
-            return -1  # Current player is checkmated = loss
-        else:
-            return 0   # Stalemate = draw
-    
-    if board.halfmove_clock >= 100:
-        return 0  # 50-move rule = draw
-    
-    if board.has_insufficient_material(): # NOT DONE 
-        return 0
-    
-    return None  # Game continues
+    """Get result from current player's perspective"""
+    result = board.get_result()
+    return None if result == 999 else result  # 999 means game continues
 
 def board_to_tensor(board):
     """Convert chess board to 12x8x8 tensor for neural network"""
@@ -63,10 +35,45 @@ def get_legal_moves(board):
     """Get legal moves from board"""
     return board.generate_legal_moves()
 
-def has_insufficient_material(board): # TO-DO
-    return True
-
 def move_to_policy_index(move):
-    """Convert chess move to policy vector index (placeholder)"""
-    # TODO: Implement proper move encoding based on AlphaZero's action space
-    return 0
+    """Convert chess move to policy vector index following AlphaZero encoding"""
+    from_square = move.get_from()
+    to_square = move.get_to()
+    
+    from_row, from_col = from_square // 8, from_square % 8
+    to_row, to_col = to_square // 8, to_square % 8
+    
+    # Calculate direction and distance
+    row_diff = to_row - from_row
+    col_diff = to_col - from_col
+    
+    # Queen moves (56 planes: 7 distances × 8 directions)
+    if abs(row_diff) == abs(col_diff) or row_diff == 0 or col_diff == 0:
+        # Calculate direction (0-7 for N, NE, E, SE, S, SW, W, NW)
+        if row_diff > 0 and col_diff == 0: direction = 0  # North
+        elif row_diff > 0 and col_diff > 0: direction = 1  # NorthEast
+        elif row_diff == 0 and col_diff > 0: direction = 2  # East
+        elif row_diff < 0 and col_diff > 0: direction = 3  # SouthEast
+        elif row_diff < 0 and col_diff == 0: direction = 4  # South
+        elif row_diff < 0 and col_diff < 0: direction = 5  # SouthWest
+        elif row_diff == 0 and col_diff < 0: direction = 6  # West
+        else: direction = 7  # NorthWest
+        
+        distance = max(abs(row_diff), abs(col_diff)) - 1  # 0-6
+        plane_index = direction * 7 + distance
+        return from_square * 73 + plane_index
+    
+    # Knight moves (8 planes)
+    knight_moves = [(-2,-1), (-2,1), (-1,-2), (-1,2), (1,-2), (1,2), (2,-1), (2,1)]
+    if (row_diff, col_diff) in knight_moves:
+        knight_index = knight_moves.index((row_diff, col_diff))
+        return from_square * 73 + 56 + knight_index
+    
+    # Underpromotions (9 planes) - only for pawn moves to 1st/8th rank
+    if move.get_piece_type() == chess_engine.PieceType.PAWN:
+        if to_row == 0 or to_row == 7:  # Promotion
+            if move.get_flags() >= 12:  # Underpromotion flags
+                # Map promotion type to index (0-8)
+                return from_square * 73 + 64 + (move.get_flags() - 12)
+    
+    return 0  # Default fallback

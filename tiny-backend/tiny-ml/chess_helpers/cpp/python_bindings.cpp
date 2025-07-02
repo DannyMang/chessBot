@@ -56,7 +56,8 @@ PYBIND11_MODULE(chess_engine, m) {
         .def("is_in_check", &ChessBitboard::isInCheck)
         .def("perft", &ChessBitboard::perft)
         .def("perft_divide", &ChessBitboard::perft_divide)
-        // Expose public members
+        .def("has_insufficient_material", &ChessBitboard::hasInsufficientMaterial)
+        .def_readonly("halfmove_clock", &ChessBitboard::halfmove_clock) 
         .def_readwrite("white_to_move", &ChessBitboard::white_to_move)
         .def_readwrite("fullmove_number", &ChessBitboard::fullmove_number)
         .def_readonly("en_passant_square", &ChessBitboard::en_passant_square)
@@ -71,5 +72,7 @@ PYBIND11_MODULE(chess_engine, m) {
         .def_readonly("black_bishops", &ChessBitboard::black_bishops)
         .def_readonly("black_rooks", &ChessBitboard::black_rooks)
         .def_readonly("black_queens", &ChessBitboard::black_queens)
-        .def_readonly("black_king", &ChessBitboard::black_king);
+        .def_readonly("black_king", &ChessBitboard::black_king)
+        .def("is_game_over", &ChessBitboard::isGameOver)
+        .def("get_result", &ChessBitboard::getResult);
 }

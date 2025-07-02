@@ -58,7 +58,10 @@ public:
     // Move execution
     void makeMove(const Move& move);
     bool isLegal(const Move& move) const;
-    
+    bool isGameOver() const;
+    bool hasInsufficientMaterial() const;
+    int getResult() const; // 1 if white wins, -1 if black wins, 0 if draw
+
     // Attack generation using magic bitboards
     Bitboard getAttacks(Square square, Piece::Type piece_type, Bitboard occupancy) const;
     
