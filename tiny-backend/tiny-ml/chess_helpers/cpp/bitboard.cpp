@@ -458,6 +458,30 @@ std::vector<Move> ChessBitboard::generateLegalMoves() const {
             legal_moves.push_back(move);
         }
     }
+
+    if (legal_moves.empty()) {
+        // check for checkmate
+        if (isInCheck(white_to_move ? Piece::Color::WHITE : Piece::Color::BLACK)) {
+            return {Move(0, 0, Piece::Type::NONE)};
+        }
+        // check for stalemate
+        if (pseudo_legal.empty()) {
+            return {Move(0, 0, Piece::Type::NONE)};
+        }
+        // draw by 50 move rule
+        if (halfmove_clock >= 100) {
+            return {Move(0, 0, Piece::Type::NONE)};
+        }
+        // draw by repetition
+        if (halfmove_clock >= 100) {
+            return {Move(0, 0, Piece::Type::NONE)};
+        }
+        // draw by insufficient material
+        if (getWhitePieces() == 0 && getBlackPieces() == 0) {
+            return {Move(0, 0, Piece::Type::NONE)};
+        }
+        // draw by 50 move rule
+    }
     
     return legal_moves;
 }
