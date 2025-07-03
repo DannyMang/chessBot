@@ -5,7 +5,7 @@ import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 from chess_helpers.cpp import chess_engine
 from model import ChessNet
-from chess_helpers.game_logic import is_game_over, get_game_result, board_to_tensor, move_to_policy_index
+from chess_helpers.game_logic import is_game_over, get_game_result, board_to_tensor, move_to_policy_index, get_legal_moves
 
 @dataclass
 class MCTSNode:
