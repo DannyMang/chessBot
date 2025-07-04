@@ -115,6 +115,16 @@ def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant
                 
                 # Get prior probability from neural network policy
                 move_idx = move_to_policy_index(move)
+                """i we use this to map move to index accross 4672 different possible moves
+                
+                it would look something like  
+                 Current Node (board position)
+                ├── Child 1 (e2-e4): prior = policy[877] = 0.15
+                ├── Child 2 (e2-e3): prior = policy[876] = 0.08
+                ├── Child 3 (Ng1-f3): prior = policy[2156] = 0.12
+                ├── Child 4 (d2-d4): prior = policy[1234] = 0.14
+                """
+                
                 prior = policy[0, move_idx].item() if move_idx < policy.shape[1] else 0.01
                 
                 child = MCTSNode(
