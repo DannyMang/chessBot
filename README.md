@@ -11,6 +11,6 @@ after model is built out
 
 to-do:
 
-handle threefold repetition in bitboard.cpp, look into Zobrist Hashes of chess positions and how to calculate that easily
+- review MCTS code in mcts.py 
 
-also implement insufficient material stalemate in @tiny-backend/tiny-ml/chess_helpers/game_logic.py
+- start coding mode; 

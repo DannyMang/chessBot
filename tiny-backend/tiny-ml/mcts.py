@@ -70,11 +70,13 @@ def mcts_traditional(model, start_state, num_simulations=100, exploration_consta
             rollout_result = get_game_result(current.board) or 0.0
     
     # 4. Backpropagation
-    for i, node in enumerate(path):
+    v = rollout_result
+    for node in reversed(path):
         node.visit_count += 1
-        # Flip value for alternating players
-        perspective_value = rollout_result * (1 if i % 2 == 0 else -1)
-        node.value += perspective_value
+        # Value is from the perspective of the player to move at the node.
+        # We negate it at each step to reflect the alternating players.
+        node.value += v
+        v = -v
 
 
 
@@ -129,11 +131,14 @@ def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant
             _, value = model.predict(board_tensor)
         
         # 3. Backpropagation
-        for i, node in enumerate(path):
+        # The NN value is from the perspective of the current node's player.
+        v = value
+        for node in reversed(path):
             node.visit_count += 1
-            # Flip value for alternating players
-            perspective_value = value * (1 if i % 2 == 0 else -1)
-            node.value += perspective_value
+            # Value is from the perspective of the player to move at the node.
+            # We negate it at each step to reflect the alternating players.
+            node.value += v
+            v = -v
     
     # Return best move based on visit counts (or UCB for exploration)
     if start_state.children:
@@ -149,8 +154,10 @@ def ucb(node, exploration_constant):
     if node.visit_count == 0:
         return float('inf')
     
-    # Q-value
-    q_value = node.value / node.visit_count
+    # Q-value from the parent's perspective.
+    # A high value for the child is a low value for the parent.
+    q_value = -node.value / node.visit_count
+    
     if hasattr(node, 'prior') and node.prior > 0:
         exploration = exploration_constant * node.prior * math.sqrt(node.parent.visit_count) / (1 + node.visit_count)
     else:
