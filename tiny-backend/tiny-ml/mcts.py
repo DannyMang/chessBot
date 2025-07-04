@@ -92,9 +92,9 @@ def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant
         current = start_state
         path = [current]
         
-        # 1. Selection - traverse down to leaf using UCB
+        # 1. Selection - traverse down to leaf using PUCT
         while current.children and not is_game_over(current.board):
-            current = max(current.children, key=lambda child: ucb(child, exploration_constant))
+            current = max(current.children, key=lambda child: puct(child, exploration_constant))
             path.append(current)
         
         # 2. Expansion + Evaluation
@@ -148,8 +148,7 @@ def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant
 
 def ucb(node, exploration_constant):
     """
-    Upper Confidence Bound calculation for node selection.
-    AlphaZero uses a modified UCB formula that includes prior probabilities.
+    Standard Upper Confidence Bound (UCT) calculation for node selection.
     """
     if node.visit_count == 0:
         return float('inf')
@@ -157,11 +156,22 @@ def ucb(node, exploration_constant):
     # Q-value from the parent's perspective.
     # A high value for the child is a low value for the parent.
     q_value = -node.value / node.visit_count
+    exploration = exploration_constant * math.sqrt(math.log(node.parent.visit_count) / node.visit_count)
+    return q_value + exploration
+
+
+def puct(node, exploration_constant):
+    """
+    Polynomial Upper Confidence for Trees (PUCT) calculation for AlphaZero.
+    This formula incorporates the prior probability from the neural network.
+    """
+    if node.visit_count == 0:
+        return float('inf')
     
-    if hasattr(node, 'prior') and node.prior > 0:
-        exploration = exploration_constant * node.prior * math.sqrt(node.parent.visit_count) / (1 + node.visit_count)
-    else:
-        exploration = exploration_constant * math.sqrt(math.log(node.parent.visit_count) / node.visit_count)
+    # Q-value from the parent's perspective.
+    # A high value for the child is a low value for the parent.
+    q_value = -node.value / node.visit_count
+    exploration = exploration_constant * node.prior * math.sqrt(node.parent.visit_count) / (1 + node.visit_count)
     return q_value + exploration
 
 

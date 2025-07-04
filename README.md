@@ -13,4 +13,4 @@ to-do:
 
 - review MCTS code in mcts.py 
 
-- start coding mode; 
+- start coding model
