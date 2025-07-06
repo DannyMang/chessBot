@@ -12,6 +12,7 @@ class ChessNet:
     """
     def __init__(self, num_moves=4672):
         self.resnet_body = ResNet(18) #resnet-18
+        #(1, 12, 8, 8) → (1, 64, 8, 8)
         self.resnet_body.conv1 = Conv2d(12, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.resnet_body.fc = None
         resnet_out_features = 512 * self.resnet_body.block.expansion
