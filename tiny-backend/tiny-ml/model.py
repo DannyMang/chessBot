@@ -1,7 +1,6 @@
-from tinygrad.tensor import Tensor
-from tinygrad.nn import Conv2d, Linear, BatchNorm
-from extra.models.resnet import ResNet, BasicBlock
-from tinygrad.helpers import get_child
+from tinygrad import Tensor, TinyJit
+from tinygrad.nn import Conv2d, Linear
+from extra.models.resnet import ResNet
 
 class ChessNet:
     """
@@ -39,6 +38,7 @@ class ChessNet:
         x = x.mean((2,3)) 
         return x
 
+    @TinyJit
     def __call__(self, x: Tensor) -> tuple[Tensor, Tensor]:
         features = self._forward_resnet_body(x)
         policy = self.policy_fc(features).log_softmax()

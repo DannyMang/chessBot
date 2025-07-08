@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 171, in <module>
-    train()
-  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 63, in train
-    optimizer = optim.Adam(optim.get_parameters(model), lr=wandb.config.learning_rate)
-                           ^^^^^^^^^^^^^^^^^^^^
-AttributeError: module 'tinygrad.nn.optim' has no attribute 'get_parameters'

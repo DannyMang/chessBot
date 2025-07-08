@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 161, in <module>
-    main()
-  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 69, in main
-    board_plane_history.append(get_board_planes(board))
-                               ^^^^^^^^^^^^^^^^
-NameError: name 'get_board_planes' is not defined
