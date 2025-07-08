@@ -74,5 +74,43 @@ PYBIND11_MODULE(chess_engine, m) {
         .def_readonly("black_queens", &ChessBitboard::black_queens)
         .def_readonly("black_king", &ChessBitboard::black_king)
         .def("is_game_over", &ChessBitboard::isGameOver)
-        .def("get_result", &ChessBitboard::getResult);
+        .def("get_result", &ChessBitboard::getResult)
+        .def("update_mailbox", &ChessBitboard::updateMailbox)
+        .def(py::pickle(
+            [](const ChessBitboard &b) { // __getstate__ method
+                // This function returns a tuple containing all the necessary state
+                // to reconstruct the object in Python.
+                return py::make_tuple(
+                    b.white_pawns, b.white_knights, b.white_bishops, b.white_rooks, b.white_queens, b.white_king,
+                    b.black_pawns, b.black_knights, b.black_bishops, b.black_rooks, b.black_queens, b.black_king,
+                    b.white_to_move, b.castling_rights, b.en_passant_square, b.halfmove_clock, b.fullmove_number);
+            },
+            [](py::tuple t) { // __setstate__ method
+                if (t.size() != 17) throw std::runtime_error("Invalid state for ChessBitboard unpickling!");
+
+                // Create a new C++ instance and populate it with the state from the tuple.
+                ChessBitboard b; 
+                b.white_pawns = t[0].cast<uint64_t>();
+                b.white_knights = t[1].cast<uint64_t>();
+                b.white_bishops = t[2].cast<uint64_t>();
+                b.white_rooks = t[3].cast<uint64_t>();
+                b.white_queens = t[4].cast<uint64_t>();
+                b.white_king = t[5].cast<uint64_t>();
+                b.black_pawns = t[6].cast<uint64_t>();
+                b.black_knights = t[7].cast<uint64_t>();
+                b.black_bishops = t[8].cast<uint64_t>();
+                b.black_rooks = t[9].cast<uint64_t>();
+                b.black_queens = t[10].cast<uint64_t>();
+                b.black_king = t[11].cast<uint64_t>();
+                b.white_to_move = t[12].cast<bool>();
+                b.castling_rights = t[13].cast<uint8_t>();
+                b.en_passant_square = t[14].cast<int>();
+                b.halfmove_clock = t[15].cast<int>();
+                b.fullmove_number = t[16].cast<int>();
+
+                b.updateMailbox(); 
+
+                return b;
+            }
+        ));
 }

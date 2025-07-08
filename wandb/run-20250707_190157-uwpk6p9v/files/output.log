@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 172, in <module>
+    train()
+  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 87, in train
+    best_child_node = mcts_alphazero(
+                      ^^^^^^^^^^^^^^^
+  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/mcts.py", line 124, in mcts_alphazero
+    new_board = copy.deepcopy(current.board)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/danielung/miniconda3/envs/tinygrad-dev/lib/python3.11/copy.py", line 161, in deepcopy
+    rv = reductor(4)
+         ^^^^^^^^^^^
+TypeError: cannot pickle 'chess_helpers.cpp.chess_engine.ChessBitboard' object

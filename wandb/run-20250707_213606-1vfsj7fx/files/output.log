@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 161, in <module>
+    main()
+  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py", line 76, in main
+    best_child_node = mcts_alphazero(
+                      ^^^^^^^^^^^^^^^
+  File "/Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/mcts.py", line 98, in mcts_alphazero
+    while current.children and not is_game_over(current.board):
+          ^^^^^^^^^^^^^^^^
+AttributeError: 'Tensor' object has no attribute 'children'

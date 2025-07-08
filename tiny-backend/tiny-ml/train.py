@@ -3,97 +3,159 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
+import wandb
 from tinygrad.tensor import Tensor
-
-# This will be your C++ engine. The .so file created from the build is a Python module.
+from tinygrad.nn import optim
+from collections import deque
+from tinygrad.nn.state import get_parameters
 from chess_helpers.cpp import chess_engine 
-
 from model import ChessNet
+from mcts import mcts_alphazero, MCTSNode
+from chess_helpers.game_logic import get_board_planes, history_to_tensor, move_to_policy_index
 
-def board_to_tensor(board: chess_engine.ChessBitboard) -> Tensor:
-    """
-    Convert the bitboard representation to a tensor for the model.
-    The tiny-ml/README.md suggests a 12x8x8 tensor.
-    """
-    # The bitboards are exposed as public members in the python bindings
-    bitboards = [
-        board.white_pawns, board.white_knights, board.white_bishops, board.white_rooks, board.white_queens, board.white_king,
-        board.black_pawns, board.black_knights, board.black_bishops, board.black_rooks, board.black_queens, board.black_king
-    ]
-    
-    # Convert each 64-bit integer into an 8x8 numpy array
-    np_bitboards = []
-    for b in bitboards:
-        # np.unpackbits expects uint8. We need to view the uint64 as 8 uint8s.
-        byte_array = np.array([b], dtype=np.uint64).view(np.uint8)
-        # Reverse the byte order to match the board representation (optional but good practice)
-        # and then unpack into bits.
-        unpacked = np.unpackbits(byte_array[::-1])
-        np_bitboards.append(unpacked.reshape(8, 8))
-    
-    # Stack into a single (12, 8, 8) numpy array and then convert to a TinyGrad tensor
-    board_state = np.stack(np_bitboards, axis=0).astype(np.float32)
-    
-    return Tensor(board_state, requires_grad=False).unsqueeze(0) # Add batch dimension
 
-def train():
+def create_policy_vector(root: MCTSNode, temperature: float) -> np.ndarray:
     """
-    This is where the main self-play training loop will go.
-    It will follow the MCTS + NN process described in the README.
+    Creates a policy vector from the visit counts of the root node's children.
+    Applies temperature scaling to encourage exploration.
     """
-    board = chess_engine.ChessBitboard() # Create a new game
-    board.set_starting_position()
+    policy_vector = np.zeros(4672, dtype=np.float32)
+    visit_counts = np.array([child.visit_count for child in root.children])
+    
+    if np.sum(visit_counts) > 0:
+        powered_visits = visit_counts ** (1 / temperature)
+        distribution = powered_visits / np.sum(powered_visits)
+        
+        for i, child in enumerate(root.children):
+            move_idx = move_to_policy_index(child.move)
+            if move_idx is not None and move_idx < 4672:
+                policy_vector[move_idx] = distribution[i]
+    return policy_vector
+
+def main():
+    #init wandb
+    config = {
+        "learning_rate": 0.001,
+        "batch_size": 128,
+        "mcts_simulations": 100,
+        "epochs": 10,
+        "games_per_epoch": 10,
+        "network_architecture": "resnet_18_custom",
+        "dirichlet_alpha": 0.3,
+        "dirichlet_epsilon": 0.25,
+        "temperature_initial": 1.0,
+        "temperature_final": 0.1,
+        "temperature_decay_half_life": 30, 
+        "replay_buffer_size": 50000
+    }
+    wandb.init(project="chess-alphazero-tinygrad", config=config)
     model = ChessNet()
+    optimizer = optim.Adam(get_parameters(model), lr=wandb.config.learning_rate)
+    
+    # Use a deque for a fixed-size, rolling replay buffer
+    replay_buffer = deque(maxlen=wandb.config.replay_buffer_size) 
+    
+    for epoch in range(wandb.config.epochs):
+        # Self-Play Phase 
+        for _ in range(wandb.config.games_per_epoch):
+            game_history_for_replay = []
+            board_plane_history = []
+            board = chess_engine.ChessBitboard()
+            board.set_starting_position()
+            move_count = 0
+            
+            while True:
+                # Add current board state to history
+                board_plane_history.append(get_board_planes(board))
+                
+                root_node = MCTSNode(board=board)
+                
+                best_child_node = mcts_alphazero(
+                    model,
+                    root_node, 
+                    list(board_plane_history),
+                    num_simulations=wandb.config.mcts_simulations,
+                    dirichlet_alpha=wandb.config.dirichlet_alpha,
+                    dirichlet_epsilon=wandb.config.dirichlet_epsilon
+                )
+    
+                if best_child_node is None: break
 
-    # --- Training Loop Placeholder ---
-    # This is a simplified version. A full implementation would involve MCTS.
-    for i in range(100): # Simulate a game of 100 moves
-        # 1. Convert board state to a tensor
-        board_tensor = board_to_tensor(board)
-        
-        # 2. Get model prediction
-        policy, value = model(board_tensor)
-        
-        # 3. Choose a move (for now, let's just get legal moves and pick one)
-        # In a real implementation, you'd use the policy to guide MCTS.
-        legal_moves = board.generate_legal_moves()
-        if not legal_moves:
-            # Check for checkmate or stalemate
-            current_player_color = chess_engine.Color.WHITE if board.white_to_move else chess_engine.Color.BLACK
-            if board.is_in_check(current_player_color):
-                print("Checkmate!")
-            else:
-                print("Stalemate!")
-            break
-        
-        # This is a placeholder for move selection.
-        # A real implementation would use the policy probabilities.
-        best_move_obj = np.random.choice(legal_moves)
-        
-        # 4. Play the move on the board
-        board.make_move(best_move_obj)
-        
-        # The move object doesn't have a nice __str__ yet, so we manually format it.
-        # You could add a __str__ or __repr__ to the Move class in python_bindings.cpp
-        from_sq = best_move_obj.get_from()
-        to_sq = best_move_obj.get_to()
-        
-        # A simple way to convert square index to algebraic notation
-        files = "abcdefgh"
-        ranks = "12345678"
-        move_str = f"{files[from_sq % 8]}{ranks[from_sq // 8]}{files[to_sq % 8]}{ranks[to_sq // 8]}"
+                # --- Temperature-based Policy Vector ---
+                policy = np.zeros(4672, dtype=np.float32)
+                
+                # Determine temperature
+                # In early stages of the game, use higher temperature for more exploration.
+                temp = wandb.config.temperature_initial * (0.5 ** (move_count / wandb.config.temperature_decay_half_life))
+                temp = max(temp, wandb.config.temperature_final)
 
-        print(f"Move {i+1}: Played {move_str}.") # Board FEN not available directly, would need to implement get_fen
+                visit_counts = np.array([child.visit_count for child in root_node.children])
+                if np.sum(visit_counts) > 0:
+                    powered_visits = visit_counts ** (1 / temp)
+                    distribution = powered_visits / np.sum(powered_visits)
+                    
+                    for i, child in enumerate(root_node.children):
+                        move_idx = move_to_policy_index(child.move)
+                        if move_idx is not None and move_idx < 4672:
+                            policy[move_idx] = distribution[i]
 
-        # 5. Store the (board_state, policy, game_outcome) for training
-        # ... (this is the experience replay buffer)
+                game_history_for_replay.append([list(board_plane_history), board.white_to_move, policy, 0.0])
+                board.make_move(best_child_node.move)
+                best_child_node.parent = None
 
-    print("Game finished!")
-    # After the game, you would use the collected data to train the model
-    # optimizer.zero_grad()
-    # loss.backward()
-    # optimizer.step()
+                move_count += 1
+                if board.is_game_over(): break
+            
+            result = board.get_result()
+            for i in range(len(game_history_for_replay)):
+                # The value target for each state is the final game result, from the perspective of the player at that state.
+                game_history_for_replay[i][3] = result if (i % 2) == (len(game_history_for_replay) % 2) else -result
+            replay_buffer.extend(game_history_for_replay)
+            print(f"  Game finished. Result: {result}, Moves: {move_count}. Replay buffer size: {len(replay_buffer)}")
+
+        print(f"Epoch {epoch+1}: Self-play finished. Replay buffer size: {len(replay_buffer)}")
+
+        #Training
+        if not replay_buffer: continue
+
+        total_value_loss = 0
+        total_policy_loss = 0
+        
+        # Batch Sampling Implementation 
+        batch_size = min(wandb.config.batch_size, len(replay_buffer))
+        batch_indices = np.random.choice(len(replay_buffer), size=batch_size, replace=False)
+        
+        for i in batch_indices:
+            state_history, color, target_policy, target_value = replay_buffer[i]
+            board_tensor = history_to_tensor(state_history, color)
+            predicted_policy, predicted_value = model(board_tensor)
+            value_loss = (predicted_value - Tensor([target_value])).square().mean()
+            policy_loss = -(Tensor(target_policy) * predicted_policy).sum()
+            
+            loss = value_loss + policy_loss
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_value_loss += value_loss.item()
+            total_policy_loss += policy_loss.item()
+        
+        avg_value_loss = total_value_loss / batch_size
+        avg_policy_loss = total_policy_loss / batch_size
+
+        wandb.log({
+            "epoch": epoch,
+            "value_loss": avg_value_loss,
+            "policy_loss": avg_policy_loss,
+            "total_loss": avg_value_loss + avg_policy_loss,
+            "replay_buffer_size": len(replay_buffer)
+        })
+        print(f"Epoch {epoch+1}: Training finished. Avg Loss: {avg_value_loss + avg_policy_loss:.4f}")
+
+    print("Training finished!")
+    wandb.finish()
 
 
 if __name__ == "__main__":
-    train() 
+    # wlll need to log in to W&B first via the terminal: `wandb login`
+    main()

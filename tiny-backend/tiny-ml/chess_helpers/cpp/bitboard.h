@@ -75,9 +75,10 @@ public:
     // FEN parsing
     void loadFen(const std::string& fen);
 
+    void updateMailbox();
+
 private:
     void initAttacks();
-    void updateMailbox();
     void removePieceFromBitboard(Square square, Piece piece);
     void addPieceToBitboard(Square square, Piece piece);
 

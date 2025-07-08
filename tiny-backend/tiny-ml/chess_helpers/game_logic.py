@@ -35,6 +35,32 @@ def get_legal_moves(board):
     """Get legal moves from board"""
     return board.generate_legal_moves()
 
+def get_board_planes(board: chess_engine.ChessBitboard) -> np.ndarray:
+    """Extracts the 12 piece planes from the board."""
+    bitboards = [
+        board.white_pawns, board.white_knights, board.white_bishops, board.white_rooks, board.white_queens, board.white_king,
+        board.black_pawns, board.black_knights, board.black_bishops, board.black_rooks, board.black_queens, board.black_king
+    ]
+    np_bitboards = []
+    for b in bitboards:
+        byte_array = np.array([b], dtype=np.uint64).view(np.uint8)
+        unpacked = np.unpackbits(byte_array[::-1])
+        np_bitboards.append(unpacked.reshape(8, 8))
+    return np.stack(np_bitboards, axis=0).astype(np.float32)
+
+def history_to_tensor(history: list, color: bool) -> Tensor:
+    """Converts a history of board planes into a tensor for the model."""
+    planes = np.zeros((25, 8, 8), dtype=np.float32)
+    
+    if len(history) > 0:
+        planes[0:12, :, :] = history[-1]
+    if len(history) > 1:
+        planes[12:24, :, :] = history[-2]
+        
+    planes[24, :, :] = 1.0 if color else 0.0
+    
+    return Tensor(planes).unsqueeze(0)
+
 def move_to_policy_index(move):
     """Convert chess move to policy vector index following AlphaZero encoding"""
     from_square = move.get_from()

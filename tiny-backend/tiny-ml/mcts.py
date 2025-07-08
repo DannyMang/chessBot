@@ -5,7 +5,7 @@ import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 from chess_helpers.cpp import chess_engine
 from model import ChessNet
-from chess_helpers.game_logic import is_game_over, get_game_result, board_to_tensor, move_to_policy_index, get_legal_moves
+from chess_helpers.game_logic import is_game_over, get_game_result, board_to_tensor, move_to_policy_index, get_legal_moves, get_board_planes, history_to_tensor
 
 @dataclass
 class MCTSNode:
@@ -13,6 +13,7 @@ class MCTSNode:
     Represents a node in the MCTS tree for AlphaZero.
     """
     board: Any  # This would be your board state
+    move: Any = None # The move that led to this state
     visit_count: int = 0
     value: float = 0.0
     parent: 'MCTSNode' = None
@@ -80,7 +81,7 @@ def mcts_traditional(model, start_state, num_simulations=100, exploration_consta
 
 
 
-def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant=1.41):
+def mcts_alphazero(model, start_state, initial_board_planes, num_simulations=100, exploration_constant=1.41, dirichlet_alpha=0.3, dirichlet_epsilon=0.25):
     """
     AlphaZero MCTS implementation:
     - Expands ALL children at once when first visiting a leaf
@@ -88,7 +89,8 @@ def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant
     - No traditional rollout - just neural network value
     """
     
-    for simulation in range(num_simulations):
+    # Main MCTS loop
+    for _ in range(num_simulations):
         current = start_state
         path = [current]
         
@@ -104,41 +106,43 @@ def mcts_alphazero(model, start_state, num_simulations=100, exploration_constant
             # Terminal position
             value = get_game_result(current.board) or 0.0
         elif not current.children:
-            # First time visiting this leaf - expand ALL children at once
-            board_tensor = board_to_tensor(current.board)
-            policy, value = model.predict(board_tensor)
-            
+            if current == start_state:
+                leaf_history = initial_board_planes
+            else:
+                current_planes = get_board_planes(current.board)
+                parent_planes = get_board_planes(current.parent.board)
+                leaf_history = [current_planes, parent_planes]
+
+            leaf_tensor = history_to_tensor(leaf_history, current.board.white_to_move)
+            policy, value = model.predict(leaf_tensor)
+
             legal_moves = get_legal_moves(current.board)
-            for move in legal_moves:
+            
+            # Add Dirichlet Noise for exploration at the root
+            if current.parent is None:
+                noise = np.random.dirichlet([dirichlet_alpha] * len(legal_moves))
+            
+            for i, move in enumerate(legal_moves):
                 new_board = copy.deepcopy(current.board)
                 new_board.make_move(move)
                 
                 # Get prior probability from neural network policy
                 move_idx = move_to_policy_index(move)
-                """i we use this to map move to index accross 4672 different possible moves
-                
-                it would look something like  
-                 Current Node (board position)
-                ├── Child 1 (e2-e4): prior = policy[877] = 0.15
-                ├── Child 2 (e2-e3): prior = policy[876] = 0.08
-                ├── Child 3 (Ng1-f3): prior = policy[2156] = 0.12
-                ├── Child 4 (d2-d4): prior = policy[1234] = 0.14
-                """
-                
                 prior = policy[0, move_idx].item() if move_idx < policy.shape[1] else 0.01
+
+                # Apply noise at the root
+                if current.parent is None:
+                    prior = (1 - dirichlet_epsilon) * prior + dirichlet_epsilon * noise[i]
                 
                 child = MCTSNode(
                     board=new_board,
+                    move=move,
                     parent=current,
                     prior=prior
                 )
                 current.children.append(child)
             
             # Use neural network value (no rollout)
-        else:
-            # This shouldn't happen with proper selection, but handle it
-            board_tensor = board_to_tensor(current.board)
-            _, value = model.predict(board_tensor)
         
         # 3. Backpropagation
         # The NN value is from the perspective of the current node's player.

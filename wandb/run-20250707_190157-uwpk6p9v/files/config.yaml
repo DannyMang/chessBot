@@ -1,0 +1,68 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            nkbkgair4wq72irp3n8ijqxtcismgwjj:
+                apple:
+                    ecpuCores: 4
+                    gpuCores: 10
+                    memoryGb: 8
+                    name: Apple M3
+                    pcpuCores: 4
+                    ramTotalBytes: "8589934592"
+                    swapTotalBytes: "21474836480"
+                codePath: tiny-backend/tiny-ml/train.py
+                codePathLocal: tiny-backend/tiny-ml/train.py
+                cpu_count: 8
+                cpu_count_logical: 8
+                disk:
+                    /:
+                        total: "494384795648"
+                        used: "384144252928"
+                email: daniel.ung@sjsu.edu
+                executable: /Users/danielung/miniconda3/envs/tinygrad-dev/bin/python3
+                git:
+                    commit: 80068b8189d6b825e0cd5a1dde94fcc09e852e58
+                    remote: git@github.com:DannyMang/chessBot.git
+                host: rh-student-wrlss-m-1524.fdu.edu
+                memory:
+                    total: "8589934592"
+                os: macOS-15.5-arm64-arm-64bit
+                program: /Users/danielung/Desktop/projects/chessBot/tiny-backend/tiny-ml/train.py
+                python: CPython 3.11.13
+                root: /Users/danielung/Desktop/projects/chessBot
+                startedAt: "2025-07-07T23:01:57.323539Z"
+                writerId: nkbkgair4wq72irp3n8ijqxtcismgwjj
+        m: []
+        python_version: 3.11.13
+        t:
+            "3":
+                - 16
+            "4": 3.11.13
+            "5": 0.21.0
+            "12": 0.21.0
+            "13": darwin-arm64
+batch_size:
+    value: 128
+dirichlet_alpha:
+    value: 0.3
+dirichlet_epsilon:
+    value: 0.25
+epochs:
+    value: 10
+games_per_epoch:
+    value: 10
+learning_rate:
+    value: 0.001
+mcts_simulations:
+    value: 100
+network_architecture:
+    value: resnet_18_custom
+replay_buffer_size:
+    value: 50000
+temperature_decay_half_life:
+    value: 30
+temperature_final:
+    value: 0.1
+temperature_initial:
+    value: 1
