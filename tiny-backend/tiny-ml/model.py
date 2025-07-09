@@ -41,18 +41,18 @@ class ChessNet:
     @TinyJit
     def __call__(self, x: Tensor) -> tuple[Tensor, Tensor]:
         features = self._forward_resnet_body(x)
-        policy = self.policy_fc(features).log_softmax()
+        policy = self.policy_fc(features)
         value = self.value_fc1(features).relu()
         value = self.value_fc2(value).tanh()
         return policy, value
     
     def predict(self, board_tensor: Tensor) -> tuple[Tensor, float]:
         with Tensor.train(False):
-            log_policy, value = self(board_tensor)
-            return log_policy.exp(), value.item()
+            policy_logits, value = self(board_tensor)
+            return policy_logits.softmax(), value.item()
 
 if __name__ == '__main__':
-    fake_board_tensor = Tensor.randn(1, 12, 8, 8) 
+    fake_board_tensor = Tensor.randn(1, 25, 8, 8) 
     model = ChessNet(num_moves=4672)
     
     policy_output, value_output = model.predict(fake_board_tensor)

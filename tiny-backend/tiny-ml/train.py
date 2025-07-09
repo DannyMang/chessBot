@@ -125,23 +125,31 @@ def main():
         batch_size = min(wandb.config.batch_size, len(replay_buffer))
         batch_indices = np.random.choice(len(replay_buffer), size=batch_size, replace=False)
         
-        for i in batch_indices:
-            state_history, color, target_policy, target_value = replay_buffer[i]
-            board_tensor = history_to_tensor(state_history, color)
-            predicted_policy, predicted_value = model(board_tensor)
-            value_loss = (predicted_value - Tensor([target_value])).square().mean()
-            policy_loss = -(Tensor(target_policy) * predicted_policy).sum()
-            
-            loss = value_loss + policy_loss
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            total_value_loss += value_loss.item()
-            total_policy_loss += policy_loss.item()
+        # Collect batch data
+        batch_histories = [replay_buffer[i][0] for i in batch_indices]
+        batch_colors = [replay_buffer[i][1] for i in batch_indices]
+        batch_target_policies = np.array([replay_buffer[i][2] for i in batch_indices])
+        batch_target_values = np.array([replay_buffer[i][3] for i in batch_indices]).reshape(-1, 1)
+
+        # Convert to tensors
+        board_tensors = Tensor.cat(*[history_to_tensor(hist, col) for hist, col in zip(batch_histories, batch_colors)], dim=0)
+        target_policies = Tensor(batch_target_policies)
+        target_values = Tensor(batch_target_values)
+
+        # Perform a single batch forward and backward pass
+        predicted_policies, predicted_values = model(board_tensors)
+
+        value_loss = (predicted_values - target_values).square().mean()
+        policy_loss = -(target_policies * predicted_policies.log_softmax()).sum() / batch_size
         
-        avg_value_loss = total_value_loss / batch_size
-        avg_policy_loss = total_policy_loss / batch_size
+        loss = value_loss + policy_loss
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        avg_value_loss = value_loss.item()
+        avg_policy_loss = policy_loss.item()
 
         wandb.log({
             "epoch": epoch,
