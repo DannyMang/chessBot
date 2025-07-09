@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
 import wandb
+import time
 from tinygrad.tensor import Tensor
 from tinygrad.nn import optim
 from collections import deque
@@ -55,9 +56,10 @@ def main():
     # Use a deque for a fixed-size, rolling replay buffer
     replay_buffer = deque(maxlen=wandb.config.replay_buffer_size) 
     
+    start_time = time.time()
     for epoch in range(wandb.config.epochs):
         # Self-Play Phase 
-        for _ in range(wandb.config.games_per_epoch):
+        for game_num in range(wandb.config.games_per_epoch):
             game_history_for_replay = []
             board_plane_history = []
             board = chess_engine.ChessBitboard()
@@ -111,7 +113,7 @@ def main():
                 # The value target for each state is the final game result, from the perspective of the player at that state.
                 game_history_for_replay[i][3] = result if (i % 2) == (len(game_history_for_replay) % 2) else -result
             replay_buffer.extend(game_history_for_replay)
-            print(f"  Game finished. Result: {result}, Moves: {move_count}. Replay buffer size: {len(replay_buffer)}")
+            print(f"  Game {game_num + 1}/{wandb.config.games_per_epoch} finished. Result: {result}, Moves: {move_count}. Replay buffer size: {len(replay_buffer)}")
 
         print(f"Epoch {epoch+1}: Self-play finished. Replay buffer size: {len(replay_buffer)}")
 
@@ -124,14 +126,11 @@ def main():
         # Batch Sampling Implementation 
         batch_size = min(wandb.config.batch_size, len(replay_buffer))
         batch_indices = np.random.choice(len(replay_buffer), size=batch_size, replace=False)
-        
-        # Collect batch data
         batch_histories = [replay_buffer[i][0] for i in batch_indices]
         batch_colors = [replay_buffer[i][1] for i in batch_indices]
         batch_target_policies = np.array([replay_buffer[i][2] for i in batch_indices])
         batch_target_values = np.array([replay_buffer[i][3] for i in batch_indices]).reshape(-1, 1)
 
-        # Convert to tensors
         board_tensors = Tensor.cat(*[history_to_tensor(hist, col) for hist, col in zip(batch_histories, batch_colors)], dim=0)
         target_policies = Tensor(batch_target_policies)
         target_values = Tensor(batch_target_values)
@@ -158,7 +157,22 @@ def main():
             "total_loss": avg_value_loss + avg_policy_loss,
             "replay_buffer_size": len(replay_buffer)
         })
-        print(f"Epoch {epoch+1}: Training finished. Avg Loss: {avg_value_loss + avg_policy_loss:.4f}")
+
+        elapsed_time = time.time() - start_time
+        epochs_done = epoch + 1
+        avg_time_per_epoch = elapsed_time / epochs_done
+        remaining_epochs = wandb.config.epochs - epochs_done
+        eta_seconds = remaining_epochs * avg_time_per_epoch
+
+        eta_h = int(eta_seconds // 3600)
+        eta_m = int((eta_seconds % 3600) // 60)
+        eta_s = int(eta_seconds % 60)
+        
+        elapsed_h = int(elapsed_time // 3600)
+        elapsed_m = int((elapsed_time % 3600) // 60)
+        
+        print(f"Epoch {epochs_done}/{wandb.config.epochs} | Loss: {avg_value_loss + avg_policy_loss:.4f} | "
+              f"Elapsed: {elapsed_h}h {elapsed_m}m | ETA: {eta_h}h {eta_m}m {eta_s}s")
 
     print("Training finished!")
     wandb.finish()
