@@ -8,7 +8,7 @@ import time
 from tinygrad.tensor import Tensor
 from tinygrad.nn import optim
 from collections import deque
-from tinygrad.nn.state import get_parameters
+from tinygrad.nn.state import get_parameters, safe_save, get_state_dict
 from chess_helpers.cpp import chess_engine 
 from model import ChessNet
 from mcts import mcts_alphazero, MCTSNode
@@ -52,6 +52,9 @@ def main():
     wandb.init(project="chess-alphazero-tinygrad", config=config)
     model = ChessNet()
     optimizer = optim.Adam(get_parameters(model), lr=wandb.config.learning_rate)
+
+    # Create a directory to save models if it doesn't exist
+    os.makedirs("models", exist_ok=True)
     
     # Use a deque for a fixed-size, rolling replay buffer
     replay_buffer = deque(maxlen=wandb.config.replay_buffer_size) 
@@ -173,6 +176,12 @@ def main():
         
         print(f"Epoch {epochs_done}/{wandb.config.epochs} | Loss: {avg_value_loss + avg_policy_loss:.4f} | "
               f"Elapsed: {elapsed_h}h {elapsed_m}m | ETA: {eta_h}h {eta_m}m {eta_s}s")
+        
+        # Save model checkpoint
+        state_dict = get_state_dict(model)
+        safe_save(state_dict, "models/chess_net_checkpoint.safetensors")
+        print(f"  Model checkpoint saved to models/chess_net_checkpoint.safetensors")
+
 
     print("Training finished!")
     wandb.finish()
