@@ -7,6 +7,7 @@ import wandb
 import time
 from tinygrad.tensor import Tensor
 from tinygrad.nn import optim
+from tinygrad.helpers import getenv
 from collections import deque
 from tinygrad.nn.state import get_parameters, safe_save, get_state_dict
 from chess_helpers.cpp import chess_engine 
@@ -49,9 +50,12 @@ def main():
         "temperature_decay_half_life": 30, 
         "replay_buffer_size": 50000
     }
-    wandb.init(project="chess-alphazero-tinygrad", config=config)
+
+    if getenv("WANDB"):
+        wandb.init(project="chess-alphazero-tinygrad", config=config)
+
     model = ChessNet()
-    optimizer = optim.Adam(get_parameters(model), lr=wandb.config.learning_rate)
+    optimizer = optim.Adam(get_parameters(model), lr=config["learning_rate"])
 
     # Create a directory to save models if it doesn't exist
     os.makedirs("models", exist_ok=True)
@@ -153,18 +157,21 @@ def main():
         avg_value_loss = value_loss.item()
         avg_policy_loss = policy_loss.item()
 
-        wandb.log({
-            "epoch": epoch,
-            "value_loss": avg_value_loss,
-            "policy_loss": avg_policy_loss,
-            "total_loss": avg_value_loss + avg_policy_loss,
-            "replay_buffer_size": len(replay_buffer)
-        })
+        if getenv("WANDB"):
+            print("--> Logging metrics to Weights & Biases...")
+            wandb.log({
+                "epoch": epoch + 1,
+                "train/value_loss": avg_value_loss,
+                "train/policy_loss": avg_policy_loss,
+                "train/total_loss": avg_value_loss + avg_policy_loss,
+                "replay_buffer_size": len(replay_buffer),
+                "learning_rate": optimizer.lr.numpy()[0]
+            })
 
         elapsed_time = time.time() - start_time
         epochs_done = epoch + 1
         avg_time_per_epoch = elapsed_time / epochs_done
-        remaining_epochs = wandb.config.epochs - epochs_done
+        remaining_epochs = config["epochs"] - epochs_done
         eta_seconds = remaining_epochs * avg_time_per_epoch
 
         eta_h = int(eta_seconds // 3600)
@@ -174,7 +181,7 @@ def main():
         elapsed_h = int(elapsed_time // 3600)
         elapsed_m = int((elapsed_time % 3600) // 60)
         
-        print(f"Epoch {epochs_done}/{wandb.config.epochs} | Loss: {avg_value_loss + avg_policy_loss:.4f} | "
+        print(f"Epoch {epochs_done}/{config['epochs']} | Loss: {avg_value_loss + avg_policy_loss:.4f} | "
               f"Elapsed: {elapsed_h}h {elapsed_m}m | ETA: {eta_h}h {eta_m}m {eta_s}s")
         
         # Save model checkpoint
@@ -184,7 +191,8 @@ def main():
 
 
     print("Training finished!")
-    wandb.finish()
+    if getenv("WANDB"):
+        wandb.finish()
 
 
 if __name__ == "__main__":
