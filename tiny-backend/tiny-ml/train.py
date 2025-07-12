@@ -7,6 +7,7 @@ import time
 import random
 from collections import deque
 from typing import List, Tuple
+import pickle
 
 import wandb
 from tinygrad.tensor import Tensor
@@ -77,7 +78,9 @@ if __name__ == "__main__":
     }
 
     if getenv("WANDB"):
-        wandb.init(project="chess-alphazero-tinygrad", config=config)
+        import wandb
+        wandb_args = {"id": wandb_id, "resume": "must"} if (wandb_id := getenv("WANDB_RESUME", "")) else {}
+        wandb.init(project="chess-alphazero-tinygrad", config=config, **wandb_args)
 
     model = ChessNet(dtype=dtypes.half)
     optimizer = Adam(get_parameters(model), lr=config["learning_rate"])
@@ -87,7 +90,17 @@ if __name__ == "__main__":
         print("Loaded model weights from models/chess_net_checkpoint.safetensors")
 
     print("--- Running in Training Mode ---")
-    replay_buffer = deque(maxlen=config["replay_buffer_size"])
+    
+    # Load replay buffer if it exists
+    replay_buffer_path = "replay_buffer.pkl"
+    if os.path.exists(replay_buffer_path):
+        with open(replay_buffer_path, 'rb') as f:
+            replay_buffer = pickle.load(f)
+        print(f"Loaded replay buffer with {len(replay_buffer)} experiences.")
+    else:
+        replay_buffer = deque(maxlen=config["replay_buffer_size"])
+        print("No existing replay buffer found. Starting a new one.")
+
     start_time = time.time()
 
     for epoch in range(config["epochs"]):
@@ -136,6 +149,12 @@ if __name__ == "__main__":
             print(f"  Game {game_num + 1}/{config['games_per_epoch']} finished. Result: {result}, Moves: {move_count}. Replay buffer size: {len(replay_buffer)}")
 
         print(f"Epoch {epoch+1}: Self-play finished. Replay buffer size: {len(replay_buffer)}")
+        
+        # Save the replay buffer after the self-play phase
+        with open(replay_buffer_path, 'wb') as f:
+            pickle.dump(replay_buffer, f)
+        print(f"Replay buffer with {len(replay_buffer)} experiences saved to {replay_buffer_path}")
+
 
         # Training 
         if len(replay_buffer) < config["batch_size"]:
