@@ -60,5 +60,5 @@ venv/
 ENV/
 env.bak/
 __pycache__/
-venv.bak/
-/wandb/
+venv.bak/ 
+/wandb/ 

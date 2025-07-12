@@ -141,9 +141,8 @@ def mcts_alphazero(model, start_state, initial_board_planes, num_simulations=100
                     prior=prior
                 )
                 current.children.append(child)
+            # (no rollout)
             
-            # Use neural network value (no rollout)
-        
         # 3. Backpropagation
         # The NN value is from the perspective of the current node's player.
         v = value

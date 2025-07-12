@@ -1,5 +1,6 @@
 from tinygrad import Tensor, TinyJit
 from tinygrad.nn import Conv2d, Linear
+from tinygrad.dtype import dtypes, DType
 from extra.models.resnet import ResNet
 
 class ChessNet:
@@ -9,7 +10,7 @@ class ChessNet:
     1. Policy Head: Outputs move probabilities.
     2. Value Head: Outputs a single value evaluating the position [-1, 1].
     """
-    def __init__(self, num_moves=4672):
+    def __init__(self, num_moves=4672, dtype: DType = dtypes.float32):
         self.resnet_body = ResNet(18) #resnet-18
         #(1, 12, 8, 8) → (1, 64, 8, 8)
         #self.resnet_body.conv1 = Conv2d(12, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -38,7 +39,6 @@ class ChessNet:
         x = x.mean((2,3)) 
         return x
 
-    @TinyJit
     def __call__(self, x: Tensor) -> tuple[Tensor, Tensor]:
         features = self._forward_resnet_body(x)
         policy = self.policy_fc(features)

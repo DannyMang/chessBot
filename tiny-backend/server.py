@@ -18,7 +18,7 @@ from chess_helpers.cpp import chess_engine as cpp_engine
 from chess_helpers.game_logic import get_board_planes
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend communication
+CORS(app)  
 
 class ChessBot:
     def __init__(self, model_path="tiny-ml/models/chess_net_checkpoint.safetensors"):
