@@ -26,3 +26,4 @@ Adjudication rules: Draw detection at ≤8 centipawns for 4+ moves, resignation 
 => calculate price 0of training
 
 - integrate w/ weights and biases to track hyperparameters
+- 
