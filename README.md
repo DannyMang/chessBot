@@ -9,6 +9,7 @@ after model is built out
 - will see performance 
 
 
+
 to-do:
 
 - how to measure perforamcne of model? 
