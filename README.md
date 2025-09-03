@@ -5,7 +5,7 @@ chess bot using burn deep learning framework
 
 
 after model is built out 
-- after training ( hopefully < 20$ on gpu )
+- after training 
 - will see performance 
 
 
